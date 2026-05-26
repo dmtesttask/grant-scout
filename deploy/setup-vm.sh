@@ -182,17 +182,6 @@ log "Встановлення Python залежностей…"
 pip3 install --break-system-packages --quiet --upgrade -r "$GRANT_SCOUT_DIR/requirements.txt"
 ok "Python залежності встановлено"
 
-# Встановлення Hermes Notion скілу (якщо є)
-if ! "$HOME/.local/bin/hermes" skills list 2>/dev/null | grep -q "notion"; then
-    log "Встановлення Hermes Notion скілу…"
-    if ! "$HOME/.local/bin/hermes" skills install official/integrations/notion > /tmp/notion_install.log 2>&1; then
-        warn "Не вдалося встановити Notion скіл — продовжуємо без нього. Помилка:"
-        cat /tmp/notion_install.log
-    else
-        ok "Notion скіл встановлено"
-    fi
-fi
-
 # Реєстрація grant-scout скілу
 log "Реєстрація grant-scout скілу в Hermes…"
 if ! "$HOME/.local/bin/hermes" skills install "$GRANT_SCOUT_DIR/SKILL.md" --name grant-scout > /tmp/skill_install.log 2>&1; then
