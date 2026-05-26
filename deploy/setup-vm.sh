@@ -281,6 +281,7 @@ WorkingDirectory=$HOME
 Environment="PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=$HERMES_ENV
 ExecStart=$HOME/.local/bin/hermes gateway
+TimeoutStopSec=240
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal

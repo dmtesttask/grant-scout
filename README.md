@@ -104,6 +104,17 @@ python3 ~/grant-scout/scripts/runner.py digest
 python3 ~/grant-scout/scripts/runner.py deadlines
 ```
 
+### 📱 Активація Telegram-бота (Home Channel)
+
+При першому зверненні до вашого бота в Telegram (надіславши команду `/start` або будь-яке повідомлення), ви отримаєте сервісне повідомлення від Hermes:
+> `📬 No home channel is set for Telegram. ... Type /sethome to make this chat your home channel, or ignore to skip.`
+
+1. Надішліть боту команду:
+   ```text
+   /sethome
+   ```
+2. Бот зафіксує ваш чат як головний ("Home Channel") для відправки щоденних результатів пошуку, сповіщень та дайджестів.
+
 ---
 
 ## ⚙️ Управління темами

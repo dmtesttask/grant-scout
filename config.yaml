@@ -176,6 +176,6 @@ llm:
   provider: "openrouter"
   base_url: "https://openrouter.ai/api/v1"
   # Модель для тестів (безкоштовна), замінити на потужнішу для продакшену
-  model: "google/gemma-3-27b-it:free"
+  model: "openrouter/free"
   max_tokens: 500
   temperature: 0.1               # Низька температура для структурованих даних
