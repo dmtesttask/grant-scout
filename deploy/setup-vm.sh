@@ -77,16 +77,23 @@ log "Python версія: $PYTHON_VERSION"
 # Крок 3: Hermes Agent
 # ─────────────────────────────────────────────────────────────────────────────
 log "Крок 3/8: Hermes Agent…"
-if command -v hermes &>/dev/null; then
-    ok "Hermes Agent вже встановлено ($(hermes --version 2>/dev/null || echo 'версія невідома'))"
+if [ -x "$HOME/.local/bin/hermes" ]; then
+    ok "Hermes Agent вже встановлено ($("$HOME/.local/bin/hermes" --version 2>/dev/null || echo 'версія невідома'))"
     log "Перевіряємо оновлення Hermes…"
-    hermes update --yes 2>/dev/null || warn "Не вдалося оновити Hermes"
+    "$HOME/.local/bin/hermes" update --yes 2>/dev/null || warn "Не вдалося оновити Hermes"
 else
     log "Встановлення Hermes Agent…"
     curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash
-    # Додати до PATH поточної сесії
-    export PATH="$HOME/.hermes/bin:$PATH"
     ok "Hermes Agent встановлено"
+fi
+
+# Встановлення Telegram залежностей для Hermes Agent
+log "Встановлення додаткових залежностей для Telegram Gateway…"
+if [ -x "$HOME/.hermes/hermes-agent/venv/bin/pip" ]; then
+    "$HOME/.hermes/hermes-agent/venv/bin/pip" install --quiet python-telegram-bot
+    ok "Telegram залежності для Hermes встановлено"
+else
+    warn "Віртуальне оточення Hermes не знайдено для встановлення Telegram залежностей"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -271,6 +278,7 @@ Wants=network-online.target
 Type=simple
 User=$USER
 WorkingDirectory=$HOME
+Environment="PATH=$HOME/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 EnvironmentFile=$HERMES_ENV
 ExecStart=$HOME/.local/bin/hermes gateway
 Restart=on-failure
