@@ -33,7 +33,8 @@ def _get_client() -> Client:
     api_key = os.environ.get("NOTION_API_KEY", "")
     if not api_key:
         raise RuntimeError("NOTION_API_KEY не встановлено")
-    return Client(auth=api_key)
+    # Явно фіксуємо версію API Notion для стабільної роботи та сумісності з ендпоінтами
+    return Client(auth=api_key, notion_version="2022-06-28")
 
 
 def _query_database(client: Client, database_id: str, **kwargs) -> dict:
