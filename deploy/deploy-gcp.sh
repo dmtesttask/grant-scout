@@ -259,13 +259,13 @@ tar -czf "$TMP_TAR" \
 run gcloud compute scp "$TMP_TAR" \
     "$VM_NAME:/tmp/grant-scout-deploy.tar.gz" \
     --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-    --ssh-flag="-o StrictHostKeyChecking=no"
+    --scp-flag="-o StrictHostKeyChecking=no"
 
 # Скопіювати .env окремо (з правами 600)
 run gcloud compute scp "$ENV_FILE" \
     "$VM_NAME:/tmp/.env.deploy" \
     --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-    --ssh-flag="-o StrictHostKeyChecking=no"
+    --scp-flag="-o StrictHostKeyChecking=no"
 
 ok "Файли скопійовано"
 
