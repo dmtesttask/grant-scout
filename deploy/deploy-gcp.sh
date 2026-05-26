@@ -298,10 +298,10 @@ if ! $DRY_RUN; then
         --zone="$ZONE" --project="$GCP_PROJECT_ID" \
         --strict-host-key-checking=no \
         --command="
-            echo '=== Hermes ===' && hermes --version 2>/dev/null || echo 'hermes: не знайдено'
+            echo '=== Hermes ===' && ~/.local/bin/hermes --version 2>/dev/null || echo 'hermes: не знайдено'
             echo '=== Python ===' && python3 --version
             echo '=== Cron ===' && crontab -l 2>/dev/null | grep grant-scout | wc -l
-            echo '=== Сервіс ===' && systemctl is-active hermes-agent 2>/dev/null || echo 'inactive'
+            echo '=== Сервіс ===' && systemctl is-active hermes-agent 2>/dev/null || true
         " 2>/dev/null || echo "Не вдалося підключитися до VM")
     echo "$VERIFY"
 fi

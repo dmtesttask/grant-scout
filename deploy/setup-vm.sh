@@ -35,6 +35,8 @@ GRANT_SCOUT_DIR="$HOME/grant-scout"
 HERMES_ENV="$HOME/.hermes/.env"
 STATE_DIR="$HOME/.grant-scout"
 
+export PATH="$HOME/.local/bin:$HOME/.hermes/bin:$PATH"
+
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo "   Grant Scout VM Setup"
@@ -121,6 +123,15 @@ else
     fi
 fi
 
+# Додаємо TELEGRAM_ALLOWED_USERS для Hermes, якщо є TELEGRAM_CHAT_ID і ще не задано
+if [ -f "$HERMES_ENV" ]; then
+    if grep -q "^TELEGRAM_CHAT_ID=" "$HERMES_ENV" && ! grep -q "^TELEGRAM_ALLOWED_USERS=" "$HERMES_ENV"; then
+        TG_CHAT_ID=$(grep "^TELEGRAM_CHAT_ID=" "$HERMES_ENV" | cut -d= -f2- | tr -d '"' | tr -d "'")
+        echo "TELEGRAM_ALLOWED_USERS=$TG_CHAT_ID" >> "$HERMES_ENV"
+        ok "Додано TELEGRAM_ALLOWED_USERS до .env"
+    fi
+fi
+
 # Завантажити змінні в поточну сесію
 if [ -f "$HERMES_ENV" ]; then
     set -o allexport
@@ -143,16 +154,8 @@ fi
 
 # Налаштування Telegram Gateway (якщо токен є)
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
-    log "Налаштування Telegram Gateway…"
-    # Перевірити чи вже налаштовано
-    if ! grep -q "TELEGRAM_BOT_TOKEN" "$HERMES_ENV" 2>/dev/null || \
-       ! hermes gateway list 2>/dev/null | grep -q "telegram"; then
-        hermes gateway setup --provider telegram \
-            --token "$TELEGRAM_BOT_TOKEN" \
-            --allowed-users "$TELEGRAM_CHAT_ID" \
-            --yes 2>/dev/null || warn "Не вдалося автоматично налаштувати gateway"
-    fi
-    ok "Telegram Gateway налаштовано"
+    log "Конфігурація Telegram Gateway…"
+    ok "Telegram Gateway налаштовано через змінні середовища"
 fi
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -180,18 +183,24 @@ pip3 install --break-system-packages --quiet --upgrade -r "$GRANT_SCOUT_DIR/requ
 ok "Python залежності встановлено"
 
 # Встановлення Hermes Notion скілу (якщо є)
-if ! hermes skills list 2>/dev/null | grep -q "notion"; then
+if ! "$HOME/.local/bin/hermes" skills list 2>/dev/null | grep -q "notion"; then
     log "Встановлення Hermes Notion скілу…"
-    hermes skills install official/integrations/notion --yes 2>/dev/null || \
-        warn "Не вдалося встановити Notion скіл — продовжуємо без нього"
+    if ! "$HOME/.local/bin/hermes" skills install official/integrations/notion > /tmp/notion_install.log 2>&1; then
+        warn "Не вдалося встановити Notion скіл — продовжуємо без нього. Помилка:"
+        cat /tmp/notion_install.log
+    else
+        ok "Notion скіл встановлено"
+    fi
 fi
 
 # Реєстрація grant-scout скілу
 log "Реєстрація grant-scout скілу в Hermes…"
-hermes skills install "$GRANT_SCOUT_DIR/SKILL.md" --name grant-scout --yes 2>/dev/null || \
-    warn "Не вдалося зареєструвати скіл — перевірте logs"
-
-ok "Grant Scout скіл встановлено"
+if ! "$HOME/.local/bin/hermes" skills install "$GRANT_SCOUT_DIR/SKILL.md" --name grant-scout > /tmp/skill_install.log 2>&1; then
+    warn "Не вдалося зареєструвати скіл — перевірте logs. Помилка:"
+    cat /tmp/skill_install.log
+else
+    ok "Grant Scout скіл встановлено"
+fi
 
 # Очищаємо всі старі cron-задачі, які містять "grant-scout"
 crontab -l 2>/dev/null | grep -v "grant-scout" > /tmp/current_cron || true
@@ -267,8 +276,7 @@ ok "Cron-задачі оновлено та налаштовано"
 log "Крок 8/8: Systemd сервіс Hermes Agent…"
 SERVICE_FILE="/etc/systemd/system/hermes-agent.service"
 
-if [ ! -f "$SERVICE_FILE" ]; then
-    sudo tee "$SERVICE_FILE" > /dev/null << EOF
+sudo tee "$SERVICE_FILE" > /dev/null << EOF
 [Unit]
 Description=Hermes Agent — Grant Scout
 After=network.target
@@ -279,7 +287,7 @@ Type=simple
 User=$USER
 WorkingDirectory=$HOME
 EnvironmentFile=$HERMES_ENV
-ExecStart=$HOME/.hermes/bin/hermes serve
+ExecStart=$HOME/.local/bin/hermes gateway
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
@@ -289,20 +297,11 @@ SyslogIdentifier=hermes-agent
 [Install]
 WantedBy=multi-user.target
 EOF
-    sudo systemctl daemon-reload
-    sudo systemctl enable hermes-agent
-    sudo systemctl start hermes-agent
-    ok "Hermes Agent сервіс створено та запущено"
-else
-    # Перезавантажити якщо потрібно
-    if ! systemctl is-active --quiet hermes-agent; then
-        sudo systemctl start hermes-agent
-        ok "Hermes Agent сервіс запущено"
-    else
-        sudo systemctl restart hermes-agent
-        ok "Hermes Agent сервіс перезапущено"
-    fi
-fi
+
+sudo systemctl daemon-reload
+sudo systemctl enable hermes-agent
+sudo systemctl restart hermes-agent
+ok "Hermes Agent сервіс створено та запущено"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Підсумок
