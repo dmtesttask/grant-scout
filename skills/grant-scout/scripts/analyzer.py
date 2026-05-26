@@ -18,9 +18,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 SITE_URL = "https://github.com/grant-scout"  # для OpenRouter HTTP-Referer
+# OPENROUTER_API_KEY читаємо динамічно всередині функцій (не на рівні модуля)
 
 
 ANALYSIS_PROMPT = """\
@@ -50,7 +50,8 @@ def analyze_item(item: dict, config: dict) -> dict:
     Аналізує один елемент через LLM.
     Повертає збагачений словник з полями аналізу.
     """
-    if not OPENROUTER_API_KEY:
+    api_key = os.environ.get("OPENROUTER_API_KEY", "")
+    if not api_key:
         logger.warning("OPENROUTER_API_KEY не встановлено — пропускаємо LLM аналіз")
         return _fallback_analysis(item)
 
@@ -61,7 +62,7 @@ def analyze_item(item: dict, config: dict) -> dict:
     prompt = ANALYSIS_PROMPT.format(
         title=item.get("title", ""),
         url=item.get("url", ""),
-        snippet=item.get("snippet", item.get("title", ""))[:500],  # обмежити розмір
+        snippet=item.get("snippet", item.get("title", ""))[:500],
     )
 
     payload = {
@@ -72,25 +73,48 @@ def analyze_item(item: dict, config: dict) -> dict:
         "response_format": {"type": "json_object"},
     }
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {api_key}",
         "HTTP-Referer": SITE_URL,
         "Content-Type": "application/json",
     }
 
+    # Затримки для retry: звичайні помилки 1с/2с, 429 Rate Limit — 15с/30с
+    RETRY_DELAYS = [1, 2]
+    RATE_LIMIT_DELAYS = [15, 30]
+
     for attempt in range(3):
         try:
             resp = requests.post(OPENROUTER_URL, json=payload, headers=headers, timeout=30)
+
+            # Окремо обробляємо 429 — рат ліміт потребує довшу паузу
+            if resp.status_code == 429:
+                wait = RATE_LIMIT_DELAYS[attempt] if attempt < len(RATE_LIMIT_DELAYS) else 60
+                logger.warning(f"LLM спроба {attempt+1}/3: 429 Rate Limit — очікуємо {wait}с...")
+                time.sleep(wait)
+                continue
+
             resp.raise_for_status()
-            content = resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content")
+
+            if not content:
+                logger.warning(f"LLM спроба {attempt+1}/3: порожня відповідь (content=None)")
+                time.sleep(RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 4)
+                continue
+
             analysis = json.loads(content)
             item.update(_normalize_analysis(analysis))
             return item
-        except (requests.exceptions.RequestException, json.JSONDecodeError, KeyError) as e:
-            logger.warning(f"LLM аналіз спроба {attempt+1}/3: {e}")
+
+        except (requests.exceptions.RequestException, json.JSONDecodeError,
+                KeyError, TypeError, ValueError) as e:
+            wait = RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 4
+            logger.warning(f"LLM спроба {attempt+1}/3: {e}")
             if attempt < 2:
-                time.sleep(2 ** attempt)
+                time.sleep(wait)
 
     # Якщо LLM не відповів — використати fallback
+    logger.info("Використовуємо fallback аналіз (без LLM)")
     return _fallback_analysis(item)
 
 
@@ -163,9 +187,10 @@ def analyze_batch(items: list[dict], config: dict) -> list[dict]:
         result = analyze_item(item, config)
         if result.get("relevance", 0) >= min_relevance and result.get("is_ukraine_relevant", True):
             analyzed.append(result)
-        # Пауза між запитами до API
+        # Пауза між запитами до API (важливо для free-tier моделей з жорстким rate limit)
         if i < len(items) - 1:
-            time.sleep(0.5)
+            delay = config.get("llm", {}).get("request_delay_sec", 3.0)
+            time.sleep(delay)
 
     logger.info(f"Після аналізу: {len(analyzed)}/{len(items)} релевантних позицій")
     return analyzed
