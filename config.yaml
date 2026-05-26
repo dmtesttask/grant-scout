@@ -132,7 +132,7 @@ sources:
     # Провайдер задається в .env: SEARCH_PROVIDER (serper або duckduckgo)
     # API ключ для Serper.dev задається в .env: SERPER_API_KEY
     max_results_per_query: 10
-    daily_limit: 90
+    daily_limit: 20
 
 # -------------------------------------------------------
 # Notion

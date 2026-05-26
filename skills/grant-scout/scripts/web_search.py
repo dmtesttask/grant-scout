@@ -16,8 +16,8 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "duckduckgo").lower()
-SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
+# Читаємо динамічно всередині функцій — не на рівні модуля,
+# щоб .env, завантажений runner.py, вже був доступний.
 
 STATE_DIR = Path(os.environ.get("GRANT_SCOUT_STATE", Path.home() / ".grant-scout"))
 STATE_FILE = STATE_DIR / "web_search_state.json"
@@ -58,6 +58,7 @@ def _increment_counter(n: int = 1) -> None:
 
 def _search_serper(query: str, max_results: int = 10) -> list[dict]:
     """Виконати пошук по всьому інтернету через Serper.dev (Google Search API)."""
+    SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
     if not SERPER_API_KEY:
         logger.warning("Serper API не налаштований (немає SERPER_API_KEY в .env)")
         return []
@@ -71,7 +72,7 @@ def _search_serper(query: str, max_results: int = 10) -> list[dict]:
         "date": "w"  # Останній тиждень
     }
     headers = {
-        "X-API-KEY": SERPER_API_KEY,
+        "X-API-KEY": SERPER_API_KEY,  # noqa: F821 — визначено вище у функції
         "Content-Type": "application/json"
     }
 
@@ -108,9 +109,9 @@ def _search_serper(query: str, max_results: int = 10) -> list[dict]:
 def _search_duckduckgo(query: str, max_results: int = 10) -> list[dict]:
     """Виконати пошук по всьому інтернету через безкоштовний DuckDuckGo."""
     try:
-        from duckduckgo_search import DDGS
+        from ddgs import DDGS  # новий пакет (ddgs замінив duckduckgo_search)
     except ImportError:
-        logger.error("Бібліотека duckduckgo_search не встановлена. Додайте її до requirements.txt")
+        logger.error("Бібліотека ddgs не встановлена. Виконайте: pip install ddgs")
         return []
 
     results = []
@@ -147,12 +148,13 @@ def _search_duckduckgo(query: str, max_results: int = 10) -> list[dict]:
 
 def search_google(query: str, max_results: int = 10) -> list[dict]:
     """Виконати один пошуковий запит за допомогою обраного провайдера."""
-    provider = SEARCH_PROVIDER
+    provider = os.environ.get("SEARCH_PROVIDER", "duckduckgo").lower()
+    serper_key = os.environ.get("SERPER_API_KEY", "")
     if provider == "serper":
-        if SERPER_API_KEY:
+        if serper_key:
             return _search_serper(query, max_results)
         else:
-            logger.warning("SEARCH_PROVIDER встановлено в serper, але SERPER_API_KEY відсутній. Перемикаємось на duckduckgo.")
+            logger.warning("SEARCH_PROVIDER=serper, але SERPER_API_KEY відсутній — перемикаємось на duckduckgo.")
             return _search_duckduckgo(query, max_results)
     else:
         return _search_duckduckgo(query, max_results)
@@ -170,8 +172,10 @@ def search_all_topics(config: dict) -> list[dict]:
     max_results = web_config.get("max_results_per_query", 10)
     daily_limit = web_config.get("daily_limit", 90)
 
-    provider = SEARCH_PROVIDER
-    if provider == "serper" and not SERPER_API_KEY:
+    provider = os.environ.get("SEARCH_PROVIDER", "duckduckgo").lower()
+    serper_key = os.environ.get("SERPER_API_KEY", "")
+    if provider == "serper" and not serper_key:
+        logger.warning("SEARCH_PROVIDER=serper, але SERPER_API_KEY відсутній — перемикаємось на duckduckgo.")
         provider = "duckduckgo"
 
     if provider == "serper":

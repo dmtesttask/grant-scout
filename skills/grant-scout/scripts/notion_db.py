@@ -18,8 +18,8 @@ from notion_client.errors import APIResponseError
 
 logger = logging.getLogger(__name__)
 
-NOTION_API_KEY = os.environ.get("NOTION_API_KEY", "")
-NOTION_PAGE_ID = os.environ.get("NOTION_PAGE_ID", "")
+# Читаємо динамічно всередині функцій — не на рівні модуля,
+# щоб .env, завантажений runner.py, вже був доступний.
 
 # Кеш хешів для поточного сеансу (щоб не запитувати Notion щоразу)
 _url_hash_cache: set[str] = set()
@@ -30,9 +30,10 @@ DB_ID_FILE = STATE_DIR / "notion_db_id.txt"
 
 
 def _get_client() -> Client:
-    if not NOTION_API_KEY:
+    api_key = os.environ.get("NOTION_API_KEY", "")
+    if not api_key:
         raise RuntimeError("NOTION_API_KEY не встановлено")
-    return Client(auth=NOTION_API_KEY)
+    return Client(auth=api_key)
 
 
 def _get_or_create_database(client: Client, config: dict) -> str:
@@ -52,11 +53,11 @@ def _get_or_create_database(client: Client, config: dict) -> str:
     logger.info("Створення нової Notion бази даних…")
     db_name = config.get("notion", {}).get("database_name", "Grant Scout — Знахідки")
 
-    if not NOTION_PAGE_ID:
+    page_id = os.environ.get("NOTION_PAGE_ID", "").replace("-", "")
+    if not page_id:
         raise RuntimeError("NOTION_PAGE_ID не встановлено — потрібен ID батьківської сторінки")
 
     # Очистити ID від дефісів (Notion приймає обидва формати)
-    page_id = NOTION_PAGE_ID.replace("-", "")
 
     database = client.databases.create(
         parent={"type": "page_id", "page_id": page_id},
@@ -166,7 +167,7 @@ def save_item(item: dict, config: dict) -> bool:
     Зберегти знахідку в Notion.
     Повертає True якщо запис створено, False якщо дублікат або помилка.
     """
-    if not NOTION_API_KEY:
+    if not os.environ.get("NOTION_API_KEY", ""):
         logger.warning("NOTION_API_KEY не встановлено — пропускаємо запис")
         return False
 
@@ -222,7 +223,7 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
     Отримати записи з дедлайном у найближчі N днів.
     Повертає список словників для Telegram-нагадувань.
     """
-    if not NOTION_API_KEY:
+    if not os.environ.get("NOTION_API_KEY", ""):
         return []
 
     client = _get_client()
@@ -276,7 +277,7 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
 
 def get_weekly_stats() -> dict:
     """Статистика за останній тиждень для дайджесту."""
-    if not NOTION_API_KEY:
+    if not os.environ.get("NOTION_API_KEY", ""):
         return {}
 
     client = _get_client()

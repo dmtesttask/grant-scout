@@ -20,6 +20,18 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+# ── Завантаження .env ДО імпорту інших модулів ───────────────────────────────
+# analyzer.py та інші модулі читають os.environ на рівні модуля (при імпорті),
+# тому .env потрібно завантажити першим.
+_ENV_FILE = Path.home() / ".hermes" / ".env"
+if _ENV_FILE.exists():
+    with open(_ENV_FILE) as _f:
+        for _line in _f:
+            _line = _line.strip()
+            if _line and not _line.startswith("#") and "=" in _line:
+                _key, _, _val = _line.partition("=")
+                os.environ.setdefault(_key.strip(), _val.strip())
+
 # Додаємо поточну директорію до шляху
 sys.path.insert(0, str(Path(__file__).parent))
 
