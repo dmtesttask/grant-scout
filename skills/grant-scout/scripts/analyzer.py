@@ -87,9 +87,18 @@ def analyze_item(item: dict, config: dict) -> dict:
         logger.warning("OPENROUTER_API_KEY не встановлено — пропускаємо LLM аналіз")
         return _fallback_analysis(item)
 
-    model = config.get("llm", {}).get("model", "google/gemma-3-27b-it:free")
-    max_tokens = config.get("llm", {}).get("max_tokens", 500)
-    temperature = config.get("llm", {}).get("temperature", 0.1)
+    llm_cfg = config.get("llm", {})
+    preset = llm_cfg.get("preset", "").strip()
+    if preset:
+        model = f"@preset/{preset}"
+        logger.info(f"Використовуємо OpenRouter пресет: {model}")
+    else:
+        model = llm_cfg.get("model")
+        if not model:
+            logger.warning("llm.model не задано в config.yaml — використовуємо fallback аналіз")
+            return _fallback_analysis(item)
+    max_tokens = llm_cfg.get("max_tokens", 500)
+    temperature = llm_cfg.get("temperature", 0.1)
 
     prompt = ANALYSIS_PROMPT.format(
         title=item.get("title", ""),

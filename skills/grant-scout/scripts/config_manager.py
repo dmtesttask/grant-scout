@@ -91,13 +91,23 @@ def _generate_keywords_llm(name: str, hints: list[str] = None) -> tuple[list[str
     if hints:
         hint_part = f" (підказки: {', '.join(hints)})"
 
-    # Спробувати взяти модель з конфігу
-    model = "google/gemma-3-27b-it:free"
+    # Єдине джерело правди — config.yaml (llm.preset або llm.model)
     try:
         config = load_config()
-        model = config.get("llm", {}).get("model", model)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning(f"Не вдалося завантажити конфіг — пропускаємо LLM генерацію ключових слів: {e}")
+        return [], []
+
+    llm_cfg = config.get("llm", {})
+    preset = llm_cfg.get("preset", "").strip()
+    if preset:
+        model = f"@preset/{preset}"
+        logger.info(f"Використовуємо OpenRouter пресет: {model}")
+    else:
+        model = llm_cfg.get("model")
+        if not model:
+            logger.warning("llm.model не задано в config.yaml — пропускаємо LLM генерацію")
+            return [], []
 
     prompt = KEYWORD_PROMPT.format(name=name, hint_part=hint_part)
     payload = {
