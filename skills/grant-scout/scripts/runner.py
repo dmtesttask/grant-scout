@@ -27,7 +27,7 @@ import config_manager
 import scraper
 import google_search
 import analyzer
-import notion_client
+import notion_db
 import telegram_formatter
 
 logger = logging.getLogger(__name__)
@@ -148,7 +148,7 @@ def run_search(config: dict, test_mode: bool = False) -> dict:
     # 3. Збереження в Notion (з дедуплікацією)
     saved_items = []
     for item in analyzed:
-        if notion_client.save_item(item, config):
+        if notion_db.save_item(item, config):
             saved_items.append(item)
 
     logger.info(f"Збережено {len(saved_items)} нових позицій в Notion")
@@ -187,7 +187,7 @@ def run_deadlines(config: dict) -> None:
 
     sent_any = False
     for days in reminder_days:
-        deadlines = notion_client.get_upcoming_deadlines(days)
+        deadlines = notion_db.get_upcoming_deadlines(days)
         # Фільтруємо точно ті, що через N днів (не більше)
         from datetime import date
         exact = [
@@ -211,7 +211,7 @@ def run_deadlines(config: dict) -> None:
 def run_digest(_config: dict) -> None:
     """Щотижневий дайджест."""
     logger.info("Формування тижневого дайджесту…")
-    stats = notion_client.get_weekly_stats()
+    stats = notion_db.get_weekly_stats()
     msg = telegram_formatter.format_weekly_digest(stats)
     send_telegram(msg)
     logger.info("Дайджест надіслано")

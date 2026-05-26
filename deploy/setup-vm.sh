@@ -168,6 +168,10 @@ log "Крок 6/8: Grant Scout скіл…"
 mkdir -p "$GRANT_SCOUT_DIR/scripts" "$STATE_DIR"
 
 # Копіюємо файли скілу (завжди — для оновлення)
+# Видаляємо старий notion_client.py (якщо залишився), щоб уникнути конфліктів імпорту
+rm -f "$GRANT_SCOUT_DIR/scripts/notion_client.py"
+rm -f "$HOME/.hermes/skills/grant-scout/scripts/notion_client.py"
+
 cp -r "$SCRIPT_DIR/../skills/grant-scout/scripts/"* "$GRANT_SCOUT_DIR/scripts/"
 cp "$SCRIPT_DIR/../skills/grant-scout/SKILL.md" "$GRANT_SCOUT_DIR/"
 cp "$SCRIPT_DIR/../skills/grant-scout/requirements.txt" "$GRANT_SCOUT_DIR/"
