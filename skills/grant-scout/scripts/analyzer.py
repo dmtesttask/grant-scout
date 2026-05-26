@@ -44,7 +44,7 @@ Return ONLY valid JSON with no explanations or extra text:
   "summary_uk": "<short description IN UKRAINIAN, 2-3 sentences>",
   "relevance": <integer 0-100, where 100 = maximally relevant for Ukrainian researchers>,
   "is_ukraine_relevant": <true if related to Ukraine or open to Ukrainians, false otherwise>
-}}\"""
+}}"""
 
 
 def _extract_json(text: str) -> str | None:
