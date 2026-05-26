@@ -1,0 +1,37 @@
+# Hermes Grant Scout — Конфігурація Hermes Agent
+# Копіюється на VM як ~/.hermes/config.yaml
+
+# LLM Backend через OpenRouter
+model:
+  provider: openrouter
+  # Модель вказана тут лише як fallback — основна береться з config.yaml
+  model: google/gemma-3-27b-it:free
+  # API ключ береться з .env: OPENROUTER_API_KEY
+  base_url: https://openrouter.ai/api/v1
+
+# Messaging Gateway
+messaging:
+  telegram:
+    enabled: true
+    # Токен береться з .env: TELEGRAM_BOT_TOKEN
+    # Дозволені користувачі беруться з .env: TELEGRAM_CHAT_ID
+
+# Дозволені інструменти для скілу grant-scout
+tools:
+  shell:
+    enabled: true
+    # Дозволити виконання Python-скриптів
+    allowed_commands:
+      - python3
+      - pip3
+  web_fetch:
+    enabled: true
+  web_search:
+    enabled: true
+  file_read:
+    enabled: true
+  file_write:
+    enabled: true
+
+# Шлях до скілів (встановлюється setup-vm.sh)
+# skills_path: ~/.hermes/skills

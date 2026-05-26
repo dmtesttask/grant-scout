@@ -1,0 +1,181 @@
+# ============================================================
+# Hermes Grant Scout — Центральний конфігураційний файл
+# ============================================================
+# API-ключі зберігаються в deploy/.env (НЕ тут)
+# Для зміни тем: редагуйте цей файл або надішліть команду боту
+
+agent:
+  name: "grant-scout"
+  version: "1.0.0"
+  report_language: "uk"          # uk = українська
+
+search:
+  # Cron розклад: двічі на день — 09:00 та 18:00 (UTC+3 → UTC+0 = 06:00/15:00)
+  # schedule_morning: "0 6 * * *"
+  schedule_evening: "0 15 * * *"
+  deadline_check:   "0 5 * * *"  # Перевірка дедлайнів щодня о 08:00
+  weekly_digest:    "0 7 * * 1"  # Щотижневий дайджест у понеділок о 10:00
+  max_results_per_source: 20
+  lookback_days: 7               # Шукати новини за останні N днів
+
+# -------------------------------------------------------
+# Теми пошуку
+# Кожна тема має:
+#   name         — відображувана назва
+#   keywords_uk  — ключові слова українською
+#   keywords_en  — ключові слова англійською
+#   enabled      — true/false
+# -------------------------------------------------------
+topics:
+  - name: "Освіта"
+    enabled: true
+    keywords_uk:
+      - "грант освіта"
+      - "конкурс грантів освіта"
+      - "стипендія педагогам"
+      - "фінансування освітніх проєктів"
+      - "конференція освіта Україна"
+    keywords_en:
+      - "education grant Ukraine"
+      - "education scholarship Ukraine"
+      - "education conference Ukraine 2025"
+      - "teaching grant Ukraine"
+
+  - name: "Мистецтво"
+    enabled: true
+    keywords_uk:
+      - "грант мистецтво"
+      - "грант культура Україна"
+      - "конкурс художників"
+      - "стипендія митці"
+      - "конференція мистецтво"
+    keywords_en:
+      - "art grant Ukraine"
+      - "culture grant Ukraine"
+      - "artist grant Ukraine 2025"
+      - "art residency Ukraine"
+
+  - name: "Музика"
+    enabled: true
+    keywords_uk:
+      - "грант музика"
+      - "стипендія музиканти"
+      - "конкурс музика Україна"
+      - "фінансування музичних проєктів"
+    keywords_en:
+      - "music grant Ukraine"
+      - "music scholarship Ukraine"
+      - "music competition grant 2025"
+
+  - name: "Комп'ютерні технології в освіті"
+    enabled: true
+    keywords_uk:
+      - "грант IT освіта"
+      - "EdTech конференція"
+      - "цифрова освіта грант"
+      - "дистанційне навчання конкурс"
+      - "інноваційні технології освіта грант"
+    keywords_en:
+      - "EdTech grant Ukraine"
+      - "digital education grant Ukraine"
+      - "e-learning conference Ukraine"
+      - "education technology grant 2025"
+
+# -------------------------------------------------------
+# Джерела даних — веб-скрапінг
+# -------------------------------------------------------
+sources:
+  websites:
+    - id: "nfdu"
+      name: "НФДУ"
+      url: "https://nfdu.gov.ua/news/"
+      enabled: true
+      # CSS-селектори для парсингу (fallback: всі посилання на сторінці)
+      selectors:
+        container: ".news-list .news-item, article, .post"
+        title: "h2, h3, .title, .news-title"
+        link: "a"
+        date: ".date, time, .published"
+
+    - id: "mon"
+      name: "МОН України"
+      url: "https://mon.gov.ua/news"
+      enabled: true
+      selectors:
+        container: ".news-item, .article-preview, article"
+        title: "h2, h3, .title"
+        link: "a"
+        date: ".date, time"
+
+    - id: "euroosvita"
+      name: "ЄвроОсвіта"
+      url: "https://euroosvita.net/prog/"
+      enabled: true
+      selectors:
+        container: ".program-item, .news-item, article"
+        title: "h2, h3, .title"
+        link: "a"
+        date: ".date, time"
+
+    - id: "ukrintei"
+      name: "УкрІНТЕІ"
+      url: "https://ukrintei.ua/news/"
+      enabled: true
+      selectors:
+        container: ".news-list li, .news-item, article"
+        title: "h2, h3, .title, a"
+        link: "a"
+        date: ".date, time"
+
+  google_search:
+    enabled: true
+    # Ключ та ID беруться з .env: GOOGLE_CSE_API_KEY та GOOGLE_CSE_ID
+    max_results_per_query: 10
+    # Лічильник запитів зберігається у state.json (100 безкоштовних/день)
+    daily_limit: 90              # Залишаємо запас
+
+# -------------------------------------------------------
+# Notion
+# -------------------------------------------------------
+notion:
+  database_name: "Grant Scout — Знахідки"
+  # NOTION_API_KEY та NOTION_PAGE_ID беруться з .env
+  properties:
+    title: "Назва"
+    type: "Тип"
+    topics: "Тематика"
+    source: "Джерело"
+    deadline: "Дедлайн"
+    url: "Посилання"
+    summary: "Опис"
+    funding: "Фінансування"
+    found_date: "Дата знахідки"
+    status: "Статус"
+    url_hash: "URL Hash"         # Для дедуплікації (прихована)
+
+# -------------------------------------------------------
+# Telegram
+# -------------------------------------------------------
+telegram:
+  # TELEGRAM_BOT_TOKEN та TELEGRAM_CHAT_ID беруться з .env
+  notifications:
+    new_findings: true           # Сповіщення про кожну нову знахідку
+    batch_mode: true             # true = надсилати пачкою, false = по одній
+    deadline_reminder_days:
+      - 7
+      - 3
+      - 1
+    weekly_digest: true
+    min_relevance_score: 60      # Не надсилати знахідки з релевантністю < 60%
+
+# -------------------------------------------------------
+# LLM Аналіз (через OpenRouter)
+# -------------------------------------------------------
+llm:
+  # OPENROUTER_API_KEY береться з .env
+  provider: "openrouter"
+  base_url: "https://openrouter.ai/api/v1"
+  # Модель для тестів (безкоштовна), замінити на потужнішу для продакшену
+  model: "google/gemma-3-27b-it:free"
+  max_tokens: 500
+  temperature: 0.1               # Низька температура для структурованих даних
