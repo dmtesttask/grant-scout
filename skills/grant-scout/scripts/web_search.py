@@ -1,11 +1,8 @@
 """
-google_search.py — Пошук через різні пошукові системи (Serper.dev, DuckDuckGo)
+web_search.py — Пошук через пошукові системи (Serper.dev або DuckDuckGo)
 
-- Підтримує двох провайдерів:
-  1. serper      — Google Search API через Serper.dev (пошук по всьому вебу)
-  2. duckduckgo  — Безкоштовний пошук через DuckDuckGo (без ключів)
-- Фільтр за датою (останній тиждень)
-- Лічильник запитів у state.json
+- serper: Google Search API через Serper.dev (потрібен SERPER_API_KEY в .env)
+- duckduckgo: Безкоштовний пошук через DuckDuckGo (без ключів)
 """
 
 import hashlib
@@ -15,17 +12,15 @@ import os
 import time
 from datetime import datetime
 from pathlib import Path
-
 import requests
 
 logger = logging.getLogger(__name__)
 
-# Параметри для провайдерів
 SEARCH_PROVIDER = os.environ.get("SEARCH_PROVIDER", "duckduckgo").lower()
 SERPER_API_KEY = os.environ.get("SERPER_API_KEY", "")
 
 STATE_DIR = Path(os.environ.get("GRANT_SCOUT_STATE", Path.home() / ".grant-scout"))
-STATE_FILE = STATE_DIR / "google_search_state.json"
+STATE_FILE = STATE_DIR / "web_search_state.json"
 
 
 def _load_state() -> dict:
@@ -47,7 +42,6 @@ def _get_remaining_quota(daily_limit: int) -> int:
     state = _load_state()
     today = datetime.utcnow().strftime("%Y-%m-%d")
     if state.get("date") != today:
-        # Новий день — скидаємо лічильник
         _save_state({"date": today, "count": 0})
         return daily_limit
     return max(0, daily_limit - state.get("count", 0))
@@ -74,7 +68,7 @@ def _search_serper(query: str, max_results: int = 10) -> list[dict]:
         "num": min(max_results, 20),
         "gl": "ua",
         "hl": "uk",  # Мова результатів
-        "date": "w"  # Останній тиждень (week)
+        "date": "w"  # Останній тиждень
     }
     headers = {
         "X-API-KEY": SERPER_API_KEY,
@@ -154,7 +148,6 @@ def _search_duckduckgo(query: str, max_results: int = 10) -> list[dict]:
 def search_google(query: str, max_results: int = 10) -> list[dict]:
     """Виконати один пошуковий запит за допомогою обраного провайдера."""
     provider = SEARCH_PROVIDER
-    
     if provider == "serper":
         if SERPER_API_KEY:
             return _search_serper(query, max_results)
@@ -168,20 +161,19 @@ def search_google(query: str, max_results: int = 10) -> list[dict]:
 def search_all_topics(config: dict) -> list[dict]:
     """
     Виконати пошук для всіх активних тем.
-    Поважає денний ліміт запитів.
     """
-    if not config.get("sources", {}).get("google_search", {}).get("enabled", True):
+    web_config = config.get("sources", {}).get("web_search", {})
+    if not web_config.get("enabled", True):
         logger.info("Пошук по вебу вимкнено в конфігу")
         return []
 
-    max_results = config["sources"]["google_search"].get("max_results_per_query", 10)
-    daily_limit = config["sources"]["google_search"].get("daily_limit", 90)
+    max_results = web_config.get("max_results_per_query", 10)
+    daily_limit = web_config.get("daily_limit", 90)
 
     provider = SEARCH_PROVIDER
     if provider == "serper" and not SERPER_API_KEY:
         provider = "duckduckgo"
 
-    # Для DuckDuckGo лімітів квоти немає
     if provider == "serper":
         remaining = _get_remaining_quota(daily_limit)
         if remaining <= 0:
@@ -209,28 +201,14 @@ def search_all_topics(config: dict) -> list[dict]:
             logger.info(f"Пошук ({provider}): «{keyword}» (тема: {topic_name})")
             results = search_google(keyword, max_results)
             queries_used += 1
-
+            
             for r in results:
-                if r["url_hash"] not in seen_hashes:
-                    seen_hashes.add(r["url_hash"])
-                    r["topic_hint"] = topic_name
+                h = r["url_hash"]
+                if h not in seen_hashes:
+                    seen_hashes.add(h)
                     all_results.append(r)
+            
+            # Невелика затримка для збереження лімітів
+            time.sleep(1.0 if provider == "serper" else 1.5)
 
-            # Затримка між запитами
-            time.sleep(1.0 if provider == "duckduckgo" else 0.5)
-
-    logger.info(f"Search ({provider}): знайдено {len(all_results)} унікальних результатів")
     return all_results
-
-
-if __name__ == "__main__":
-    from config_manager import load_config
-
-    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
-    config = load_config()
-    results = search_all_topics(config)
-    print(json.dumps(results[:5], ensure_ascii=False, indent=2))
-    print(f"\nЗнайдено: {len(results)} результатів")
-
-    state = _load_state()
-    print(f"Використано запитів сьогодні: {state.get('count', 0)}")

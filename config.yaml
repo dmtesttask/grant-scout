@@ -88,7 +88,7 @@ sources:
   websites:
     - id: "nfdu"
       name: "НФДУ"
-      url: "https://nfdu.gov.ua/news/"
+      url: "https://nrfu.org.ua/news/"
       enabled: true
       # CSS-селектори для парсингу (fallback: всі посилання на сторінці)
       selectors:
@@ -127,12 +127,12 @@ sources:
         link: "a"
         date: ".date, time"
 
-  google_search:
+  web_search:
     enabled: true
-    # Ключ та ID беруться з .env: GOOGLE_CSE_API_KEY та GOOGLE_CSE_ID
+    # Провайдер задається в .env: SEARCH_PROVIDER (serper або duckduckgo)
+    # API ключ для Serper.dev задається в .env: SERPER_API_KEY
     max_results_per_query: 10
-    # Лічильник запитів зберігається у state.json (100 безкоштовних/день)
-    daily_limit: 90              # Залишаємо запас
+    daily_limit: 90
 
 # -------------------------------------------------------
 # Notion

@@ -25,7 +25,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 import config_manager
 import scraper
-import google_search
+import web_search
 import analyzer
 import notion_db
 import telegram_formatter
@@ -115,14 +115,13 @@ def run_search(config: dict, test_mode: bool = False) -> dict:
         test_config = dict(config)
         test_config["sources"] = {
             "websites": config.get("sources", {}).get("websites", [])[:1],
-            "google_search": {"enabled": False},
         }
         raw_items = scraper.scrape_all_sites(test_config)
         raw_items = raw_items[:5]  # Обмежити 5 позиціями
     else:
         raw_items = scraper.scrape_all_sites(config)
-        google_items = google_search.search_all_topics(config)
-        raw_items.extend(google_items)
+        web_items = web_search.search_all_topics(config)
+        raw_items.extend(web_items)
 
     logger.info(f"Зібрано {len(raw_items)} сирих результатів")
 
