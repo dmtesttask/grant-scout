@@ -69,6 +69,13 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         db_id = DB_ID_FILE.read_text().strip()
         if db_id:
             logger.debug(f"Використовуємо існуючу Notion БД: {db_id}")
+            try:
+                client.databases.update(
+                    database_id=db_id,
+                    properties={"URL Hash": {"rich_text": {}}}
+                )
+            except Exception as e:
+                logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
             return db_id
 
     logger.info("Створення нової Notion бази даних…")
