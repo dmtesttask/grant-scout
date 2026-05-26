@@ -187,12 +187,12 @@ ok "Python залежності встановлено"
 
 # Реєстрація grant-scout скілу
 log "Реєстрація grant-scout скілу в Hermes…"
-if ! "$HOME/.local/bin/hermes" skills install "$GRANT_SCOUT_DIR/SKILL.md" --name grant-scout > /tmp/skill_install.log 2>&1; then
-    warn "Не вдалося зареєструвати скіл — перевірте logs. Помилка:"
-    cat /tmp/skill_install.log
-else
-    ok "Grant Scout скіл встановлено"
+mkdir -p "$HOME/.hermes/skills/grant-scout"
+cp "$GRANT_SCOUT_DIR/SKILL.md" "$HOME/.hermes/skills/grant-scout/SKILL.md"
+if [ -d "$GRANT_SCOUT_DIR/scripts" ]; then
+    cp -r "$GRANT_SCOUT_DIR/scripts" "$HOME/.hermes/skills/grant-scout/"
 fi
+ok "Grant Scout скіл встановлено"
 
 # Очищаємо всі старі cron-задачі, які містять "grant-scout"
 crontab -l 2>/dev/null | grep -v "grant-scout" > /tmp/current_cron || true
