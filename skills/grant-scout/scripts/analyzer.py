@@ -24,25 +24,27 @@ SITE_URL = "https://github.com/grant-scout"  # для OpenRouter HTTP-Referer
 
 
 ANALYSIS_PROMPT = """\
-Ти — асистент для аналізу наукових грантів та конференцій. Проаналізуй наступний текст та поверни JSON.
+You are an assistant for analyzing scientific grants and conferences. Analyze the text below and return a JSON object.
 
-Текст:
+IMPORTANT LANGUAGE RULE: The "summary_uk" field MUST be written in Ukrainian (uk-UA). All other fields follow their specified formats.
+
+Text to analyze:
 ---
-Назва: {title}
+Title: {title}
 URL: {url}
-Фрагмент: {snippet}
+Snippet: {snippet}
 ---
 
-Поверни ТІЛЬКИ валідний JSON без пояснень:
+Return ONLY valid JSON with no explanations or extra text:
 {{
-  "type": "<одне з: Грант, Конференція, Стипендія, Програма обміну, Невизначено>",
-  "topics": ["<теми з переліку: Освіта, Мистецтво, Музика, EdTech, Наука, Інше>"],
-  "deadline": "<дедлайн у форматі YYYY-MM-DD або null якщо не знайдено>",
-  "funding": "<сума/умови фінансування або null>",
-  "summary_uk": "<короткий опис українською 2-3 речення>",
-  "relevance": <число від 0 до 100, де 100 = максимально релевантно для українських науковців>,
-  "is_ukraine_relevant": <true якщо стосується України або відкрито для українців, false якщо ні>
-}}"""
+  "type": "<one of: Грант, Конференція, Стипендія, Програма обміну, Невизначено>",
+  "topics": ["<topics from: Освіта, Мистецтво, Музика, EdTech, Наука, Інше>"],
+  "deadline": "<deadline in YYYY-MM-DD format, or null if not found>",
+  "funding": "<funding amount/conditions, or null>",
+  "summary_uk": "<short description IN UKRAINIAN, 2-3 sentences>",
+  "relevance": <integer 0-100, where 100 = maximally relevant for Ukrainian researchers>,
+  "is_ukraine_relevant": <true if related to Ukraine or open to Ukrainians, false otherwise>
+}}\"""
 
 
 def _extract_json(text: str) -> str | None:

@@ -62,16 +62,17 @@ def list_topics(enabled_only: bool = False) -> list[dict]:
 # ── LLM-генерація ключових слів ──────────────────────────────────────────────
 
 KEYWORD_PROMPT = """\
-Ти — помічник для пошуку наукових грантів та конференцій в Україні.
-Сгенеруй ключові слова для пошуку за темою «{name}»{hint_part}.
+You are a keyword generation assistant for finding scientific grants and conferences targeting Ukrainian researchers.
+Generate search keywords for the topic "{name}"{hint_part}.
 
-Вимоги:
-- keywords_uk: 5-7 фраз українською (2-4 слова кожна), що реально шукають на сайтах грантів
-- keywords_en: 4-6 фраз англійською для міжнародних баз та Google
-- Включай варіанти: грант, конкурс, стипендія, конференція, програма, фінансування
-- Враховуй контекст України та наукової спільноти
+Requirements:
+- keywords_uk: 5-7 Ukrainian-language phrases (2-4 words each) that users actually search for on grant websites.
+  Use Ukrainian words: грант, конкурс, стипендія, конференція, програма, фінансування.
+- keywords_en: 4-6 English-language phrases suitable for international databases and Google Scholar.
+- Cover variants: grant, competition, scholarship, conference, program, funding, fellowship.
+- Take into account the Ukrainian academic and scientific context.
 
-Поверни ТІЛЬКИ валідний JSON без пояснень:
+IMPORTANT: Return ONLY valid JSON with no explanations or extra text:
 {{"keywords_uk": [...], "keywords_en": [...]}}"""
 
 
