@@ -45,6 +45,36 @@ URL: {url}
 }}"""
 
 
+def _extract_json(text: str) -> str | None:
+    """Витягнути JSON-рядок з відповіді LLM.
+    Моделі без response_format часто загортають JSON у ```json ... ```
+    або додають пояснення до/після — знаходимо перший валідний {...}.
+    """
+    if not text:
+        return None
+
+    # Спробувати 1: зняти markdown-огортку ```json ... ``` або ``` ... ```
+    fence = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", text, re.DOTALL)
+    if fence:
+        return fence.group(1)
+
+    # Спробувати 2: знайти перший { і відповідний } (жадібний пошук)
+    start = text.find("{")
+    if start == -1:
+        return None
+    # Йдемо по тексту, рахуємо дужки
+    depth = 0
+    for i, ch in enumerate(text[start:], start):
+        if ch == "{":
+            depth += 1
+        elif ch == "}":
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+
+    return None
+
+
 def analyze_item(item: dict, config: dict) -> dict:
     """
     Аналізує один елемент через LLM.
@@ -70,7 +100,8 @@ def analyze_item(item: dict, config: dict) -> dict:
         "messages": [{"role": "user", "content": prompt}],
         "max_tokens": max_tokens,
         "temperature": temperature,
-        "response_format": {"type": "json_object"},
+        # response_format НЕ використовуємо — більшість free-tier моделей
+        # не підтримують json_object і повертають content=None
     }
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -102,7 +133,17 @@ def analyze_item(item: dict, config: dict) -> dict:
                 time.sleep(RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 4)
                 continue
 
-            analysis = json.loads(content)
+            # Модель може загорнути JSON у ```json ... ``` або додати текст перед/після
+            json_str = _extract_json(content)
+            if not json_str:
+                logger.warning(f"LLM спроба {attempt+1}/3: JSON не знайдено у відповіді")
+                time.sleep(RETRY_DELAYS[attempt] if attempt < len(RETRY_DELAYS) else 4)
+                continue
+
+            analysis = json.loads(json_str)
+            if not isinstance(analysis, dict):
+                logger.warning(f"LLM спроба {attempt+1}/3: відповідь не є словником")
+                continue
             item.update(_normalize_analysis(analysis))
             return item
 
@@ -119,31 +160,73 @@ def analyze_item(item: dict, config: dict) -> dict:
 
 
 def _normalize_analysis(analysis: dict) -> dict:
-    """Нормалізувати та валідувати відповідь LLM."""
+    """Нормалізувати та валідувати відповідь LLM.
+    LLM може повернути будь-який тип у будь-якому полі —
+    кожне поле явно приводимо до очікуваного типу.
+    """
     valid_types = {"Грант", "Конференція", "Стипендія", "Програма обміну", "Невизначено"}
-    item_type = analysis.get("type", "Невизначено")
+
+    # type: очікуємо рядок; якщо список — беремо перший елемент
+    raw_type = analysis.get("type", "Невизначено")
+    if isinstance(raw_type, list):
+        raw_type = raw_type[0] if raw_type else "Невизначено"
+    item_type = str(raw_type) if raw_type else "Невизначено"
     if item_type not in valid_types:
         item_type = "Невизначено"
 
-    # Дедлайн — перевірити формат
+    # deadline: очікуємо рядок YYYY-MM-DD або null
     deadline = analysis.get("deadline")
+    if isinstance(deadline, list):
+        deadline = deadline[0] if deadline else None
     if deadline:
         try:
-            datetime.strptime(deadline, "%Y-%m-%d")
+            datetime.strptime(str(deadline), "%Y-%m-%d")
+            deadline = str(deadline)
         except (ValueError, TypeError):
             deadline = None
 
+    # relevance: очікуємо число 0–100
     relevance = analysis.get("relevance", 50)
-    if not isinstance(relevance, (int, float)):
+    if isinstance(relevance, list):
+        relevance = relevance[0] if relevance else 50
+    try:
+        relevance = max(0, min(100, int(relevance)))
+    except (ValueError, TypeError):
         relevance = 50
-    relevance = max(0, min(100, int(relevance)))
+
+    # topics: очікуємо список рядків
+    raw_topics = analysis.get("topics", [])
+    if isinstance(raw_topics, str):
+        raw_topics = [raw_topics]
+    elif not isinstance(raw_topics, list):
+        raw_topics = []
+    # Якщо елементи є списками — вирівнюємо
+    topics = []
+    for t in raw_topics:
+        if isinstance(t, list):
+            topics.extend(str(x) for x in t if x)
+        elif t:
+            topics.append(str(t))
+
+    # funding: очікуємо рядок або null
+    funding = analysis.get("funding")
+    if isinstance(funding, list):
+        funding = ", ".join(str(x) for x in funding if x) or None
+    elif funding is not None:
+        funding = str(funding) or None
+
+    # summary_uk: очікуємо рядок
+    summary = analysis.get("summary_uk", "")
+    if isinstance(summary, list):
+        summary = " ".join(str(x) for x in summary if x)
+    summary = str(summary) if summary else ""
 
     return {
         "type": item_type,
-        "topics_detected": analysis.get("topics", []),
+        "topics_detected": topics,
         "deadline": deadline,
-        "funding": analysis.get("funding"),
-        "summary_uk": analysis.get("summary_uk", ""),
+        "funding": funding,
+        "summary_uk": summary,
         "relevance": relevance,
         "is_ukraine_relevant": bool(analysis.get("is_ukraine_relevant", True)),
     }
