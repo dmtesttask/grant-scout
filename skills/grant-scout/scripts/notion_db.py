@@ -78,22 +78,28 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
             return db_id
 
-    logger.info("Створення нової Notion бази даних…")
+    # Створюємо базу даних через httpx, щоб побачити сиру відповідь
+    logger.info("Створення нової Notion бази даних (httpx)…")
+    
+    import httpx
+    
+    headers = {
+        "Authorization": f"Bearer {client.options.auth if hasattr(client, 'options') and hasattr(client.options, 'auth') else os.environ.get('NOTION_API_KEY', '')}",
+        "Notion-Version": "2022-06-28",
+        "Content-Type": "application/json"
+    }
+    
     db_name = config.get("notion", {}).get("database_name", "Grant Scout — Знахідки")
-
     page_id = os.environ.get("NOTION_PAGE_ID", "").replace("-", "")
     if not page_id:
         raise RuntimeError("NOTION_PAGE_ID не встановлено — потрібен ID батьківської сторінки")
 
-    # Очистити ID від дефісів (Notion приймає обидва формати)
-
-    database = client.databases.create(
-        parent={"type": "page_id", "page_id": page_id},
-        title=[{"type": "text", "text": {"content": db_name}}],
-        properties={
-            "Назва": {"type": "title", "title": {}},
+    payload = {
+        "parent": {"type": "page_id", "page_id": page_id},
+        "title": [{"type": "text", "text": {"content": db_name}}],
+        "properties": {
+            "Назва": {"title": {}},
             "Тип": {
-                "type": "select",
                 "select": {
                     "options": [
                         {"name": "Грант", "color": "green"},
@@ -105,7 +111,6 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 }
             },
             "Тематика": {
-                "type": "multi_select",
                 "multi_select": {
                     "options": [
                         {"name": "Освіта", "color": "yellow"},
@@ -118,7 +123,6 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 }
             },
             "Джерело": {
-                "type": "select",
                 "select": {
                     "options": [
                         {"name": "НФДУ", "color": "blue"},
@@ -129,11 +133,11 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Дедлайн": {"type": "date", "date": {}},
-            "Посилання": {"type": "url", "url": {}},
-            "Опис": {"type": "rich_text", "rich_text": {}},
-            "Фінансування": {"type": "rich_text", "rich_text": {}},
-            "Дата знахідки": {"type": "date", "date": {}},
+            "Дедлайн": {"date": {}},
+            "Посилання": {"url": {}},
+            "Опис": {"rich_text": {}},
+            "Фінансування": {"rich_text": {}},
+            "Дата знахідки": {"date": {}},
             "Статус": {
                 "type": "select",
                 "select": {
@@ -170,7 +174,7 @@ def _load_hash_cache(client: Client, db_id: str) -> None:
         props = db_info.get("properties", {})
         url_hash_prop = props.get("URL Hash")
         if not url_hash_prop:
-            logger.warning("Властивість 'URL Hash' не знайдена у базі даних!")
+            logger.warning(f"Властивість 'URL Hash' не знайдена у базі даних! Наявні властивості: {list(props.keys())}")
             return
         prop_id = url_hash_prop.get("id")
     except Exception as e:
