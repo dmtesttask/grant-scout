@@ -159,6 +159,20 @@ def _load_hash_cache(client: Client, db_id: str) -> None:
         return
 
     logger.info("Завантаження кешу хешів з Notion…")
+    
+    # Отримати ID властивості "URL Hash", щоб уникнути помилки "Could not find property with name or id"
+    try:
+        db_info = client.databases.retrieve(database_id=db_id)
+        props = db_info.get("properties", {})
+        url_hash_prop = props.get("URL Hash")
+        if not url_hash_prop:
+            logger.warning("Властивість 'URL Hash' не знайдена у базі даних!")
+            return
+        prop_id = url_hash_prop.get("id")
+    except Exception as e:
+        logger.error(f"Помилка отримання схеми БД: {e}")
+        prop_id = "URL Hash"
+
     has_more = True
     start_cursor = None
 
@@ -171,12 +185,18 @@ def _load_hash_cache(client: Client, db_id: str) -> None:
             client,
             db_id,
             **query_args,
-            filter={"property": "URL Hash", "rich_text": {"is_not_empty": True}},
+            filter={"property": prop_id, "rich_text": {"is_not_empty": True}},
         )
 
         for page in response.get("results", []):
-            props = page.get("properties", {})
-            hash_prop = props.get("URL Hash", {}).get("rich_text", [])
+            page_props = page.get("properties", {})
+            # Отримуємо значення за іменем або ID
+            hash_prop = None
+            for key, val in page_props.items():
+                if key == "URL Hash" or page_props[key].get("id") == prop_id:
+                    hash_prop = val.get("rich_text", [])
+                    break
+                    
             if hash_prop:
                 _url_hash_cache.add(hash_prop[0]["text"]["content"])
 
