@@ -33,8 +33,7 @@ def _get_client() -> Client:
     api_key = os.environ.get("NOTION_API_KEY", "")
     if not api_key:
         raise RuntimeError("NOTION_API_KEY не встановлено")
-    # Явно фіксуємо версію API Notion для стабільної роботи та сумісності з ендпоінтами
-    return Client(auth=api_key, notion_version="2022-06-28")
+    return Client(auth=api_key)
 
 
 def _query_database(client: Client, database_id: str, **kwargs) -> dict:
@@ -47,12 +46,20 @@ def _query_database(client: Client, database_id: str, **kwargs) -> dict:
         return client.databases.query(database_id=database_id, **kwargs)
     except AttributeError:
         # Якщо методу query немає (версії v3.x), виконуємо прямий HTTP-запит до API Notion.
-        # Це працює на всіх версіях клієнта, оскільки сам endpoint на сервері Notion незмінний.
+        # Для цього тимчасово перемикаємо версію API на "2022-06-28", яка підтримує запити до баз даних,
+        # щоб уникнути помилки InvalidRequestURL.
+        old_version = getattr(client.options, "notion_version", None)
+        if old_version:
+            client.options.notion_version = "2022-06-28"
         try:
-            return client.request(path=f"databases/{database_id}/query", method="POST", body=kwargs)
-        except TypeError:
-            # На випадок зміни сигнатури методу request у майбутніх версіях SDK (наприклад, positional arguments)
-            return client.request(method="POST", path=f"databases/{database_id}/query", json=kwargs)
+            try:
+                return client.request(path=f"databases/{database_id}/query", method="POST", body=kwargs)
+            except TypeError:
+                # На випадок зміни сигнатури методу request у майбутніх версіях SDK (наприклад, positional arguments)
+                return client.request(method="POST", path=f"databases/{database_id}/query", json=kwargs)
+        finally:
+            if old_version:
+                client.options.notion_version = old_version
 
 
 def _get_or_create_database(client: Client, config: dict) -> str:
