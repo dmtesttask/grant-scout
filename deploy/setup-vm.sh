@@ -145,12 +145,8 @@ fi
 # ─────────────────────────────────────────────────────────────────────────────
 log "Крок 5/8: Конфігурація Hermes Agent…"
 HERMES_CFG="$HOME/.hermes/config.yaml"
-if [ ! -f "$HERMES_CFG" ]; then
-    cp "$SCRIPT_DIR/hermes-config.yaml" "$HERMES_CFG"
-    ok "Конфіг Hermes створено"
-else
-    ok "Конфіг Hermes вже є — не перезаписуємо"
-fi
+cp "$SCRIPT_DIR/hermes-config.yaml" "$HERMES_CFG"
+ok "Конфіг Hermes оновлено та застосовано"
 
 # Налаштування Telegram Gateway (якщо токен є)
 if [ -n "${TELEGRAM_BOT_TOKEN:-}" ] && [ -n "${TELEGRAM_CHAT_ID:-}" ]; then
