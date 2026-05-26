@@ -46,7 +46,7 @@ echo ""
 # ─────────────────────────────────────────────────────────────────────────────
 log "Крок 1/8: Оновлення пакетів системи…"
 sudo apt-get update -qq
-sudo apt-get upgrade -y -qq
+sudo DEBIAN_FRONTEND=noninteractive apt-get upgrade -y -o Dpkg::Options::="--force-confdef" -o Dpkg::Options::="--force-confold" -qq
 ok "Система оновлена"
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -176,7 +176,7 @@ fi
 
 # Встановлення Python залежностей
 log "Встановлення Python залежностей…"
-pip3 install --quiet --upgrade -r "$GRANT_SCOUT_DIR/requirements.txt"
+pip3 install --break-system-packages --quiet --upgrade -r "$GRANT_SCOUT_DIR/requirements.txt"
 ok "Python залежності встановлено"
 
 # Встановлення Hermes Notion скілу (якщо є)
