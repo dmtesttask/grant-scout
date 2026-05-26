@@ -259,13 +259,13 @@ tar -czf "$TMP_TAR" \
 run gcloud compute scp "$TMP_TAR" \
     "$VM_NAME:/tmp/grant-scout-deploy.tar.gz" \
     --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-    --scp-flag="-o StrictHostKeyChecking=no"
+    --strict-host-key-checking=no
 
 # Скопіювати .env окремо (з правами 600)
 run gcloud compute scp "$ENV_FILE" \
     "$VM_NAME:/tmp/.env.deploy" \
     --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-    --scp-flag="-o StrictHostKeyChecking=no"
+    --strict-host-key-checking=no
 
 ok "Файли скопійовано"
 
@@ -275,7 +275,7 @@ ok "Файли скопійовано"
 step "Крок 4/5: Налаштування на VM…"
 run gcloud compute ssh "$VM_NAME" \
     --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-    --ssh-flag="-o StrictHostKeyChecking=no" \
+    --strict-host-key-checking=no \
     --command="
         set -e
         echo '>> Розпакування файлів…'
@@ -296,7 +296,7 @@ step "Крок 5/5: Верифікація…"
 if ! $DRY_RUN; then
     VERIFY=$(gcloud compute ssh "$VM_NAME" \
         --zone="$ZONE" --project="$GCP_PROJECT_ID" \
-        --ssh-flag="-o StrictHostKeyChecking=no" \
+        --strict-host-key-checking=no \
         --command="
             echo '=== Hermes ===' && hermes --version 2>/dev/null || echo 'hermes: не знайдено'
             echo '=== Python ===' && python3 --version
