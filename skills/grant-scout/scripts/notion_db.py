@@ -33,8 +33,9 @@ DB_ID_FILE = STATE_DIR / "notion_db_id.txt"
 def _get_client() -> Client:
     api_key = os.environ.get("NOTION_API_KEY", "")
     if not api_key:
-        raise RuntimeError("NOTION_API_KEY не встановлено")
-    return Client(auth=api_key)
+        logger.error("Відсутній NOTION_API_KEY у .env")
+        sys.exit(1)
+    return Client(auth=api_key, notion_version="2022-06-28")
 
 
 def _query_database(client: Client, database_id: str, **kwargs) -> dict:
@@ -79,26 +80,18 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
             return db_id
 
-    # Створюємо базу даних через httpx, щоб побачити сиру відповідь
-    logger.info("Створення нової Notion бази даних (httpx)…")
-    
-    import httpx
-    
-    headers = {
-        "Authorization": f"Bearer {client.options.auth if hasattr(client, 'options') and hasattr(client.options, 'auth') else os.environ.get('NOTION_API_KEY', '')}",
-        "Notion-Version": "2022-06-28",
-        "Content-Type": "application/json"
-    }
+    # Створюємо базу даних
+    logger.info("Створення нової Notion бази даних…")
     
     db_name = config.get("notion", {}).get("database_name", "Grant Scout — Знахідки")
     page_id = os.environ.get("NOTION_PAGE_ID", "").replace("-", "")
     if not page_id:
         raise RuntimeError("NOTION_PAGE_ID не встановлено — потрібен ID батьківської сторінки")
 
-    payload = {
-        "parent": {"type": "page_id", "page_id": page_id},
-        "title": [{"type": "text", "text": {"content": db_name}}],
-        "properties": {
+    database = client.databases.create(
+        parent={"type": "page_id", "page_id": page_id},
+        title=[{"type": "text", "text": {"content": db_name}}],
+        properties={
             "Назва": {"title": {}},
             "Тип": {
                 "select": {
@@ -152,16 +145,8 @@ def _get_or_create_database(client: Client, config: dict) -> str:
             "Релевантність": {"number": {"format": "percent"}},
             "URL Hash": {"rich_text": {}},
         }
-    }
+    )
     
-    response = httpx.post("https://api.notion.com/v1/databases", json=payload, headers=headers)
-    logger.info(f"httpx response ({response.status_code}): {response.text}")
-    
-    if response.status_code != 200:
-        logger.error("Не вдалося створити базу даних!")
-        sys.exit(1)
-        
-    database = response.json()
     db_id = database["id"]
     DB_ID_FILE.write_text(db_id)
     logger.info(f"✅ Notion БД створено: {db_id}")
