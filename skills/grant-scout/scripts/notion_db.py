@@ -10,6 +10,7 @@ notion_db.py — Клієнт для роботи з Notion API
 import json
 import logging
 import os
+import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
@@ -139,7 +140,6 @@ def _get_or_create_database(client: Client, config: dict) -> str:
             "Фінансування": {"rich_text": {}},
             "Дата знахідки": {"date": {}},
             "Статус": {
-                "type": "select",
                 "select": {
                     "options": [
                         {"name": "🆕 Нове", "color": "green"},
@@ -149,11 +149,19 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Релевантність": {"type": "number", "number": {"format": "percent"}},
-            "URL Hash": {"type": "rich_text", "rich_text": {}},
-        },
-    )
-
+            "Релевантність": {"number": {"format": "percent"}},
+            "URL Hash": {"rich_text": {}},
+        }
+    }
+    
+    response = httpx.post("https://api.notion.com/v1/databases", json=payload, headers=headers)
+    logger.info(f"httpx response ({response.status_code}): {response.text}")
+    
+    if response.status_code != 200:
+        logger.error("Не вдалося створити базу даних!")
+        sys.exit(1)
+        
+    database = response.json()
     db_id = database["id"]
     DB_ID_FILE.write_text(db_id)
     logger.info(f"✅ Notion БД створено: {db_id}")
