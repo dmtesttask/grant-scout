@@ -72,7 +72,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
             try:
                 client.databases.update(
                     database_id=db_id,
-                    properties={"URL Hash": {"rich_text": {}}}
+                    properties={"URL Hash": {"type": "rich_text", "rich_text": {}}}
                 )
             except Exception as e:
                 logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
@@ -91,8 +91,9 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         parent={"type": "page_id", "page_id": page_id},
         title=[{"type": "text", "text": {"content": db_name}}],
         properties={
-            "Назва": {"title": {}},
+            "Назва": {"type": "title", "title": {}},
             "Тип": {
+                "type": "select",
                 "select": {
                     "options": [
                         {"name": "Грант", "color": "green"},
@@ -104,6 +105,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 }
             },
             "Тематика": {
+                "type": "multi_select",
                 "multi_select": {
                     "options": [
                         {"name": "Освіта", "color": "yellow"},
@@ -116,6 +118,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                 }
             },
             "Джерело": {
+                "type": "select",
                 "select": {
                     "options": [
                         {"name": "НФДУ", "color": "blue"},
@@ -126,12 +129,13 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Дедлайн": {"date": {}},
-            "Посилання": {"url": {}},
-            "Опис": {"rich_text": {}},
-            "Фінансування": {"rich_text": {}},
-            "Дата знахідки": {"date": {}},
+            "Дедлайн": {"type": "date", "date": {}},
+            "Посилання": {"type": "url", "url": {}},
+            "Опис": {"type": "rich_text", "rich_text": {}},
+            "Фінансування": {"type": "rich_text", "rich_text": {}},
+            "Дата знахідки": {"type": "date", "date": {}},
             "Статус": {
+                "type": "select",
                 "select": {
                     "options": [
                         {"name": "🆕 Нове", "color": "green"},
@@ -141,8 +145,8 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Релевантність": {"number": {"format": "percent"}},
-            "URL Hash": {"rich_text": {}},
+            "Релевантність": {"type": "number", "number": {"format": "percent"}},
+            "URL Hash": {"type": "rich_text", "rich_text": {}},
         },
     )
 
