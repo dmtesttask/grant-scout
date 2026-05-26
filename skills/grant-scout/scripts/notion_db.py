@@ -36,6 +36,24 @@ def _get_client() -> Client:
     return Client(auth=api_key)
 
 
+def _query_database(client: Client, database_id: str, **kwargs) -> dict:
+    """
+    Універсальний метод запиту до бази даних Notion.
+    Забезпечує сумісність між різними версіями notion-client (v2.x та v3.x).
+    """
+    try:
+        # Спробувати стандартний метод (v2.x та старіші версії)
+        return client.databases.query(database_id=database_id, **kwargs)
+    except AttributeError:
+        # Якщо методу query немає (версії v3.x), виконуємо прямий HTTP-запит до API Notion.
+        # Це працює на всіх версіях клієнта, оскільки сам endpoint на сервері Notion незмінний.
+        try:
+            return client.request(path=f"databases/{database_id}/query", method="POST", body=kwargs)
+        except TypeError:
+            # На випадок зміни сигнатури методу request у майбутніх версіях SDK (наприклад, positional arguments)
+            return client.request(method="POST", path=f"databases/{database_id}/query", json=kwargs)
+
+
 def _get_or_create_database(client: Client, config: dict) -> str:
     """
     Отримати ID бази даних Notion або створити нову.
@@ -135,12 +153,14 @@ def _load_hash_cache(client: Client, db_id: str) -> None:
     start_cursor = None
 
     while has_more:
-        kwargs = {"database_id": db_id, "page_size": 100}
+        query_args = {"page_size": 100}
         if start_cursor:
-            kwargs["start_cursor"] = start_cursor
+            query_args["start_cursor"] = start_cursor
 
-        response = client.databases.query(
-            **kwargs,
+        response = _query_database(
+            client,
+            db_id,
+            **query_args,
             filter={"property": "URL Hash", "rich_text": {"is_not_empty": True}},
         )
 
@@ -233,8 +253,9 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
     future = (datetime.utcnow() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
 
     try:
-        response = client.databases.query(
-            database_id=db_id,
+        response = _query_database(
+            client,
+            db_id,
             filter={
                 "and": [
                     {"property": "Дедлайн", "date": {"on_or_after": today}},
@@ -289,8 +310,9 @@ def get_weekly_stats() -> dict:
     week_ago = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     try:
-        response = client.databases.query(
-            database_id=db_id,
+        response = _query_database(
+            client,
+            db_id,
             filter={"property": "Дата знахідки", "date": {"on_or_after": week_ago}},
         )
     except APIResponseError:

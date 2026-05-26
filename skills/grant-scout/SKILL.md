@@ -56,6 +56,11 @@ Execute the corresponding mode based on the command you receive:
 1. Run: `python3 ~/grant-scout/scripts/runner.py test`
 2. Display results in chat (do NOT write to Notion)
 
+### `test-save` — Manual test run with Notion write
+1. Run: `python3 ~/grant-scout/scripts/runner.py test-save`
+2. Limit inputs to max 10 raw results total (1 site + 1 search query)
+3. Analyze and save findings to Notion, send Telegram notification
+
 ---
 
 ## Telegram Commands from User
@@ -65,6 +70,7 @@ Process user Telegram messages according to this table:
 | Command (Ukrainian input) | Action |
 |---------------------------|--------|
 | `запусти пошук` / `пошук зараз` | Immediate `search` run |
+| `тестовий пошук` | Immediate `test-save` run |
 | `дайджест` | Immediate `digest` run |
 | `дедлайни` | Immediate `deadlines` run |
 | `список тем` | Show active topics from config.yaml |

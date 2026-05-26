@@ -94,7 +94,10 @@ gcloud compute ssh grant-scout-vm --zone=europe-west1-b --project=YOUR_PROJECT_I
 # Тестовий запуск (1 сайт, 5 результатів, без запису в Notion)
 python3 ~/grant-scout/scripts/runner.py test
 
-# Повний пошук
+# Обмежений тестовий запуск із записом в Notion (макс 10 результатів)
+python3 ~/grant-scout/scripts/runner.py test-save
+
+# Повний пошук (обхід усіх сайтів та вебу)
 python3 ~/grant-scout/scripts/runner.py search
 
 # Тижневий дайджест
@@ -181,6 +184,7 @@ python3 ~/grant-scout/scripts/runner.py remove-topic "Медицина"
 | Команда | Дія |
 |---------|-----|
 | `запусти пошук` | Негайний пошук |
+| `тестовий пошук` | Обмежений тестовий пошук із записом в Notion (макс 10 результатів) |
 | `дайджест` | Тижневий звіт |
 | `дедлайни` | Перевірка дедлайнів |
 | `список тем` | Активні теми |

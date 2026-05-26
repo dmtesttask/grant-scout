@@ -6,10 +6,11 @@ runner.py — Головний оркестратор Grant Scout
   digest          — Тижневий дайджест (cron пн 10:00)
   deadlines       — Перевірка дедлайнів (cron щодня)
   test            — Тестовий запуск (1 тема, без запису)
+  test-save       — Тестовий запуск з обмеженням до 10 ресурсів та записом в Notion
   add-topic NAME  — Додати тему
   remove-topic N  — Видалити тему
   topics          — Список тем
-  status          — Статус системи
+  status          — Status системи
 """
 
 import json
@@ -108,7 +109,7 @@ def send_telegram(text: str, parse_mode: str = "Markdown") -> bool:
 # Режим: search
 # ─────────────────────────────────────────────
 
-def run_search(config: dict, test_mode: bool = False) -> dict:
+def run_search(config: dict, test_mode: bool = False, limit: int = None) -> dict:
     """
     Повний цикл пошуку:
     1. Скрапінг сайтів
@@ -118,18 +119,44 @@ def run_search(config: dict, test_mode: bool = False) -> dict:
     5. Telegram-сповіщення
     """
     logger.info("=" * 50)
-    logger.info(f"{'ТЕСТОВИЙ ' if test_mode else ''}ПОШУК — {datetime.now().strftime('%d.%m.%Y %H:%M')}")
+    logger.info(f"{'ТЕСТОВИЙ ' if test_mode else ''}{'ОБМЕЖЕНИЙ ' if limit else ''}ПОШУК — {datetime.now().strftime('%d.%m.%Y %H:%M')}")
     logger.info("=" * 50)
 
     # 1. Скрапінг
     if test_mode:
-        # В тестовому режимі — тільки перший сайт
+        # В тестовому режимі — тільки перший сайт, без запису в Notion
         test_config = dict(config)
         test_config["sources"] = {
             "websites": config.get("sources", {}).get("websites", [])[:1],
         }
         raw_items = scraper.scrape_all_sites(test_config)
         raw_items = raw_items[:5]  # Обмежити 5 позиціями
+    elif limit is not None:
+        # Для обмеженого тестового запуску з записом (test-save)
+        test_config = dict(config)
+        test_config["sources"] = {
+            "websites": config.get("sources", {}).get("websites", [])[:1],
+            "web_search": dict(config.get("sources", {}).get("web_search", {}))
+        }
+        test_config["sources"]["web_search"]["max_results_per_query"] = 5
+        
+        # Обмежуємо скрапінг до першого сайту (до 5 посилань)
+        raw_items = scraper.scrape_all_sites(test_config)
+        raw_items = raw_items[:5]
+        
+        # Обмежуємо веб-пошук: тільки перша тема і тільки 1 ключове слово
+        topics = config.get("topics", [])
+        if topics:
+            first_topic = dict(topics[0])
+            keywords = first_topic.get("keywords_uk", []) + first_topic.get("keywords_en", [])
+            first_topic["keywords_uk"] = keywords[:1]
+            first_topic["keywords_en"] = []
+            test_config["topics"] = [first_topic]
+            
+            web_items = web_search.search_all_topics(test_config)
+            raw_items.extend(web_items[:5])
+            
+        raw_items = raw_items[:limit]
     else:
         raw_items = scraper.scrape_all_sites(config)
         web_items = web_search.search_all_topics(config)
@@ -280,6 +307,13 @@ def main():
 
     elif mode == "test":
         run_search(config, test_mode=True)
+
+    elif mode == "test-save":
+        result = run_search(config, test_mode=False, limit=10)
+        state["last_run"] = datetime.now().isoformat()
+        state["total_found"] = state.get("total_found", 0) + result.get("found", 0)
+        state["total_saved"] = state.get("total_saved", 0) + result.get("saved", 0)
+        save_state(state)
 
     elif mode == "deadlines":
         run_deadlines(config)
