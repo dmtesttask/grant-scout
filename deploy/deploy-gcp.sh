@@ -42,7 +42,7 @@ run() {
     if $DRY_RUN; then
         echo -e "  ${YELLOW}[DRY-RUN]${NC} $*"
     else
-        eval "$@"
+        "$@"
     fi
 }
 
