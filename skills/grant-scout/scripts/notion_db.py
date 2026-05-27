@@ -43,9 +43,17 @@ def _get_properties_mapping(config: dict) -> dict:
         "found_date": "Дата знахідки",
         "url_hash": "URL Hash"
     }
-    if not config:
+    if not config or not isinstance(config, dict):
         return default_props
-    config_props = config.get("notion", {}).get("properties", {})
+    
+    notion_config = config.get("notion") or {}
+    if not isinstance(notion_config, dict):
+        notion_config = {}
+        
+    config_props = notion_config.get("properties") or {}
+    if not isinstance(config_props, dict):
+        config_props = {}
+        
     props = {}
     for key, val in default_props.items():
         props[key] = config_props.get(key) or val
@@ -111,51 +119,55 @@ def _get_or_create_database(client: Client, config: dict) -> str:
     if not page_id:
         raise RuntimeError("NOTION_PAGE_ID не встановлено — потрібен ID батьківської сторінки")
 
+    db_properties = {
+        props["title"]: {"title": {}},
+        props["summary"]: {"rich_text": {}},
+        props["url"]: {"url": {}},
+        props["source"]: {
+            "select": {
+                "options": [
+                    {"name": "НФДУ", "color": "blue"},
+                    {"name": "МОН України", "color": "yellow"},
+                    {"name": "ЄвроОсвіта", "color": "green"},
+                    {"name": "УкрІНТЕІ", "color": "orange"},
+                    {"name": "Google Search", "color": "red"},
+                ]
+            }
+        },
+        props["type"]: {
+            "select": {
+                "options": [
+                    {"name": "Грант", "color": "green"},
+                    {"name": "Конференція", "color": "blue"},
+                    {"name": "Стипендія", "color": "purple"},
+                    {"name": "Програма обміну", "color": "orange"},
+                    {"name": "Невизначено", "color": "gray"},
+                ]
+            }
+        },
+        props["topics"]: {
+            "multi_select": {
+                "options": [
+                    {"name": "Освіта", "color": "yellow"},
+                    {"name": "Мистецтво", "color": "pink"},
+                    {"name": "Музика", "color": "red"},
+                    {"name": "EdTech", "color": "blue"},
+                    {"name": "Наука", "color": "green"},
+                    {"name": "Інше", "color": "gray"},
+                ]
+            }
+        },
+        props["deadline"]: {"date": {}},
+        props["found_date"]: {"date": {}},
+        props["url_hash"]: {"rich_text": {}},
+    }
+
+    logger.info(f"Створюємо базу Notion з назвою '{db_name}' та властивостями: {list(db_properties.keys())}")
+
     database = client.databases.create(
         parent={"type": "page_id", "page_id": page_id},
         title=[{"type": "text", "text": {"content": db_name}}],
-        properties={
-            props["title"]: {"title": {}},
-            props["summary"]: {"rich_text": {}},
-            props["url"]: {"url": {}},
-            props["source"]: {
-                "select": {
-                    "options": [
-                        {"name": "НФДУ", "color": "blue"},
-                        {"name": "МОН України", "color": "yellow"},
-                        {"name": "ЄвроОсвіта", "color": "green"},
-                        {"name": "УкрІНТЕІ", "color": "orange"},
-                        {"name": "Google Search", "color": "red"},
-                    ]
-                }
-            },
-            props["type"]: {
-                "select": {
-                    "options": [
-                        {"name": "Грант", "color": "green"},
-                        {"name": "Конференція", "color": "blue"},
-                        {"name": "Стипендія", "color": "purple"},
-                        {"name": "Програма обміну", "color": "orange"},
-                        {"name": "Невизначено", "color": "gray"},
-                    ]
-                }
-            },
-            props["topics"]: {
-                "multi_select": {
-                    "options": [
-                        {"name": "Освіта", "color": "yellow"},
-                        {"name": "Мистецтво", "color": "pink"},
-                        {"name": "Музика", "color": "red"},
-                        {"name": "EdTech", "color": "blue"},
-                        {"name": "Наука", "color": "green"},
-                        {"name": "Інше", "color": "gray"},
-                    ]
-                }
-            },
-            props["deadline"]: {"date": {}},
-            props["found_date"]: {"date": {}},
-            props["url_hash"]: {"rich_text": {}},
-        }
+        properties=db_properties
     )
     
     db_id = database["id"]
