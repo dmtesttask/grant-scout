@@ -34,7 +34,7 @@ def escape_md(text: str) -> str:
 def format_new_finding(item: dict) -> str:
     """Форматування одного нового запису для Telegram."""
     icon = TYPE_ICONS.get(item.get("type", ""), "📌")
-    title = item.get("title", "Без назви")[:120]
+    title = item.get("title_uk", item.get("title", "Без назви"))[:120]
     summary = item.get("summary_uk", "")[:300]
     url = item.get("url", "")
     source = item.get("source_name", "")

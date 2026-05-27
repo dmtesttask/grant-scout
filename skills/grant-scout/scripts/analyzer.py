@@ -26,7 +26,7 @@ SITE_URL = "https://github.com/grant-scout"  # для OpenRouter HTTP-Referer
 ANALYSIS_PROMPT = """\
 You are an assistant for analyzing scientific grants and conferences. Analyze the text below and return a JSON object.
 
-IMPORTANT LANGUAGE RULE: The "summary_uk" field MUST be written in Ukrainian (uk-UA). All other fields follow their specified formats.
+IMPORTANT LANGUAGE RULE: The "title_uk" and "summary_uk" fields MUST be written in Ukrainian (uk-UA). All other fields follow their specified formats.
 
 Text to analyze:
 ---
@@ -37,6 +37,7 @@ Snippet: {snippet}
 
 Return ONLY valid JSON with no explanations or extra text:
 {{
+  "title_uk": "<short title in Ukrainian, 5-8 words, communicating the essence of the event/news/grant>",
   "type": "<one of: Грант, Конференція, Стипендія, Програма обміну, Невизначено>",
   "topics": ["<topics from: Освіта, Мистецтво, Музика, EdTech, Наука, Інше>"],
   "deadline": "<deadline in YYYY-MM-DD format, or null if not found>",
@@ -153,7 +154,10 @@ def analyze_item(item: dict, config: dict) -> dict:
             if not isinstance(analysis, dict):
                 logger.warning(f"LLM спроба {attempt+1}/3: відповідь не є словником")
                 continue
-            item.update(_normalize_analysis(analysis))
+            normalized = _normalize_analysis(analysis)
+            if not normalized.get("title_uk"):
+                normalized["title_uk"] = item.get("title", "")
+            item.update(normalized)
             return item
 
         except (requests.exceptions.RequestException, json.JSONDecodeError,
@@ -230,7 +234,14 @@ def _normalize_analysis(analysis: dict) -> dict:
         summary = " ".join(str(x) for x in summary if x)
     summary = str(summary) if summary else ""
 
+    # title_uk: очікуємо рядок
+    title_uk = analysis.get("title_uk", "")
+    if isinstance(title_uk, list):
+        title_uk = " ".join(str(x) for x in title_uk if x)
+    title_uk = str(title_uk).strip() if title_uk else ""
+
     return {
+        "title_uk": title_uk,
         "type": item_type,
         "topics_detected": topics,
         "deadline": deadline,
@@ -255,6 +266,7 @@ def _fallback_analysis(item: dict) -> dict:
         item_type = "Грант"
 
     item.update({
+        "title_uk": item.get("title", ""),
         "type": item_type,
         "topics_detected": [item.get("topic_hint", "Інше")],
         "deadline": None,
@@ -269,15 +281,28 @@ def _fallback_analysis(item: dict) -> dict:
 def analyze_batch(items: list[dict], config: dict) -> list[dict]:
     """
     Аналізує список елементів.
-    Фільтрує за мінімальною релевантністю після аналізу.
+    Фільтрує за мінімальною релевантністю після аналізу,
+    а також відсіює знахідки, дедлайн яких уже минув.
     """
     min_relevance = config.get("telegram", {}).get("notifications", {}).get("min_relevance_score", 60)
     analyzed = []
+    current_date = datetime.now().date()
 
     for i, item in enumerate(items):
         logger.info(f"Аналіз {i+1}/{len(items)}: {item.get('title', '')[:60]}…")
         result = analyze_item(item, config)
         if result.get("relevance", 0) >= min_relevance and result.get("is_ukraine_relevant", True):
+            # Перевірка дедлайну: пропускаємо якщо дата дедлайну вже в минулому
+            deadline = result.get("deadline")
+            if deadline:
+                try:
+                    dl_date = datetime.strptime(deadline, "%Y-%m-%d").date()
+                    if dl_date < current_date:
+                        logger.info(f"Пропускаємо знахідку через минулий дедлайн ({deadline}): {result.get('title')}")
+                        continue
+                except ValueError:
+                    logger.warning(f"Невірний формат дедлайну ({deadline}) для: {result.get('title')}")
+            
             analyzed.append(result)
         # Пауза між запитами до API (важливо для free-tier моделей з жорстким rate limit)
         if i < len(items) - 1:

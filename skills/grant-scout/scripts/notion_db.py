@@ -93,6 +93,19 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         title=[{"type": "text", "text": {"content": db_name}}],
         properties={
             "Назва": {"title": {}},
+            "Опис": {"rich_text": {}},
+            "Посилання": {"url": {}},
+            "Джерело": {
+                "select": {
+                    "options": [
+                        {"name": "НФДУ", "color": "blue"},
+                        {"name": "МОН України", "color": "yellow"},
+                        {"name": "ЄвроОсвіта", "color": "green"},
+                        {"name": "УкрІНТЕІ", "color": "orange"},
+                        {"name": "Google Search", "color": "red"},
+                    ]
+                }
+            },
             "Тип": {
                 "select": {
                     "options": [
@@ -116,33 +129,8 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Джерело": {
-                "select": {
-                    "options": [
-                        {"name": "НФДУ", "color": "blue"},
-                        {"name": "МОН України", "color": "yellow"},
-                        {"name": "ЄвроОсвіта", "color": "green"},
-                        {"name": "УкрІНТЕІ", "color": "orange"},
-                        {"name": "Google Search", "color": "red"},
-                    ]
-                }
-            },
             "Дедлайн": {"date": {}},
-            "Посилання": {"url": {}},
-            "Опис": {"rich_text": {}},
-            "Фінансування": {"rich_text": {}},
             "Дата знахідки": {"date": {}},
-            "Статус": {
-                "select": {
-                    "options": [
-                        {"name": "🆕 Нове", "color": "green"},
-                        {"name": "👀 Переглянуто", "color": "yellow"},
-                        {"name": "📝 Подано", "color": "blue"},
-                        {"name": "📦 Архів", "color": "gray"},
-                    ]
-                }
-            },
-            "Релевантність": {"number": {"format": "percent"}},
             "URL Hash": {"rich_text": {}},
         }
     )
@@ -233,15 +221,13 @@ def save_item(item: dict, config: dict) -> bool:
 
     # Підготувати властивості
     props = {
-        "Назва": {"title": [{"text": {"content": item.get("title", "Без назви")[:2000]}}]},
-        "Тип": {"select": {"name": item.get("type", "Невизначено")}},
-        "Джерело": {"select": {"name": item.get("source_name", "Інше")[:100]}},
-        "Посилання": {"url": item.get("url", "")},
+        "Назва": {"title": [{"text": {"content": item.get("title_uk", item.get("title", "Без назви"))[:2000]}}]},
         "Опис": {"rich_text": [{"text": {"content": item.get("summary_uk", "")[:2000]}}]},
-        "Статус": {"select": {"name": "🆕 Нове"}},
+        "Посилання": {"url": item.get("url", "")},
+        "Джерело": {"select": {"name": item.get("source_name", "Інше")[:100]}},
+        "Тип": {"select": {"name": item.get("type", "Невизначено")}},
         "Дата знахідки": {"date": {"start": datetime.utcnow().strftime("%Y-%m-%d")}},
         "URL Hash": {"rich_text": [{"text": {"content": url_hash}}]},
-        "Релевантність": {"number": item.get("relevance", 50) / 100},
     }
 
     # Тематика
@@ -253,11 +239,6 @@ def save_item(item: dict, config: dict) -> bool:
     deadline = item.get("deadline")
     if deadline:
         props["Дедлайн"] = {"date": {"start": deadline}}
-
-    # Фінансування
-    funding = item.get("funding")
-    if funding:
-        props["Фінансування"] = {"rich_text": [{"text": {"content": str(funding)[:500]}}]}
 
     try:
         client.pages.create(parent={"database_id": db_id}, properties=props)
@@ -291,10 +272,6 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
                 "and": [
                     {"property": "Дедлайн", "date": {"on_or_after": today}},
                     {"property": "Дедлайн", "date": {"on_or_before": future}},
-                    {
-                        "property": "Статус",
-                        "select": {"does_not_equal": "📦 Архів"},
-                    },
                 ]
             },
             sorts=[{"property": "Дедлайн", "direction": "ascending"}],

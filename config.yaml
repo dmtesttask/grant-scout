@@ -142,15 +142,13 @@ notion:
   # NOTION_API_KEY та NOTION_PAGE_ID беруться з .env
   properties:
     title: "Назва"
+    summary: "Опис"
+    url: "Посилання"
+    source: "Джерело"
     type: "Тип"
     topics: "Тематика"
-    source: "Джерело"
     deadline: "Дедлайн"
-    url: "Посилання"
-    summary: "Опис"
-    funding: "Фінансування"
     found_date: "Дата знахідки"
-    status: "Статус"
     url_hash: "URL Hash"         # Для дедуплікації (прихована)
 
 # -------------------------------------------------------
