@@ -89,6 +89,53 @@ def _query_database(client: Client, database_id: str, **kwargs) -> dict:
             return compat_client.request(method="POST", path=f"databases/{database_id}/query", json=kwargs)
 
 
+def _create_database(client: Client, parent: dict, title: list, properties: dict) -> dict:
+    """
+    Універсальний метод створення бази даних в Notion.
+    Запобігає багу в SDK, коли властивості (properties) вирізаються методом pick.
+    """
+    payload = {
+        "parent": parent,
+        "title": title,
+        "properties": properties
+    }
+    try:
+        # Спочатку пробуємо через низькорівневий request, щоб обійти баг з pick() в SDK
+        return client.request(path="databases", method="POST", body=payload)
+    except Exception as e:
+        logger.debug(f"Помилка при створенні бази даних через client.request: {e}. Пробуємо стандартний метод SDK.")
+        try:
+            return client.databases.create(
+                parent=parent,
+                title=title,
+                properties=properties
+            )
+        except TypeError:
+            return client.request(method="POST", path="databases", json=payload)
+
+
+def _update_database(client: Client, database_id: str, properties: dict) -> dict:
+    """
+    Універсальний метод оновлення бази даних в Notion.
+    Запобігає багу в SDK, коли властивості (properties) вирізаються методом pick.
+    """
+    payload = {
+        "properties": properties
+    }
+    try:
+        # Спочатку пробуємо через низькорівневий request, щоб обійти баг з pick() в SDK
+        return client.request(path=f"databases/{database_id}", method="PATCH", body=payload)
+    except Exception as e:
+        logger.debug(f"Помилка при оновленні бази даних через client.request: {e}. Пробуємо стандартний метод SDK.")
+        try:
+            return client.databases.update(
+                database_id=database_id,
+                properties=properties
+            )
+        except TypeError:
+            return client.request(method="PATCH", path=f"databases/{database_id}", json=payload)
+
+
 def _get_or_create_database(client: Client, config: dict) -> str:
     """
     Отримати ID бази даних Notion або створити нову.
@@ -103,7 +150,8 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         if db_id:
             logger.debug(f"Використовуємо існуючу Notion БД: {db_id}")
             try:
-                client.databases.update(
+                _update_database(
+                    client,
                     database_id=db_id,
                     properties={props["url_hash"]: {"rich_text": {}}}
                 )
@@ -164,7 +212,8 @@ def _get_or_create_database(client: Client, config: dict) -> str:
 
     logger.info(f"Створюємо базу Notion з назвою '{db_name}' та властивостями: {list(db_properties.keys())}")
 
-    database = client.databases.create(
+    database = _create_database(
+        client,
         parent={"type": "page_id", "page_id": page_id},
         title=[{"type": "text", "text": {"content": db_name}}],
         properties=db_properties
