@@ -50,7 +50,7 @@ def format_new_finding(item: dict) -> str:
     if deadline:
         try:
             dl_date = datetime.strptime(deadline, "%Y-%m-%d").date()
-            days_left = (dl_date - date.today()).days
+            days_left = (dl_date - datetime.utcnow().date()).days
             if days_left >= 0:
                 lines.append(f"⏰ Дедлайн: {deadline} (залишилось {days_left} дн.)")
             else:
@@ -123,7 +123,7 @@ def format_weekly_digest(stats: dict) -> str:
     items = stats.get("items", [])
 
     lines = [f"📊 *Тижневий дайджест Grant Scout*"]
-    lines.append(f"🗓️ {datetime.now().strftime('%d.%m.%Y')}\n")
+    lines.append(f"🗓️ {datetime.utcnow().strftime('%d.%m.%Y')}\n")
     lines.append(f"✅ Знайдено за тиждень: *{total}* позицій\n")
 
     if by_type:
@@ -157,7 +157,7 @@ def format_weekly_digest(stats: dict) -> str:
 
 def format_status_message(cron_info: dict = None) -> str:
     """Форматування статусу системи."""
-    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    now = datetime.utcnow().strftime("%d.%m.%Y %H:%M") + " UTC"
     lines = [
         "⚙️ *Grant Scout — Статус*",
         f"🕐 Поточний час: {now}",

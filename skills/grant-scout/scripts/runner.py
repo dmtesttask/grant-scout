@@ -31,7 +31,7 @@ if _ENV_FILE.exists():
             _line = _line.strip()
             if _line and not _line.startswith("#") and "=" in _line:
                 _key, _, _val = _line.partition("=")
-                os.environ.setdefault(_key.strip(), _val.strip())
+                os.environ.setdefault(_key.strip(), _val.strip().strip("'\""))
 
 # Додаємо поточну директорію до шляху
 sys.path.insert(0, str(Path(__file__).parent))
@@ -225,13 +225,12 @@ def run_deadlines(config: dict) -> None:
 
     sent_any = False
     for days in reminder_days:
-        deadlines = notion_db.get_upcoming_deadlines(days)
+        deadlines = notion_db.get_upcoming_deadlines(days, config)
         # Фільтруємо точно ті, що через N днів (не більше)
-        from datetime import date
         exact = [
             d for d in deadlines
             if d.get("deadline")
-            and (datetime.strptime(d["deadline"], "%Y-%m-%d").date() - date.today()).days == days
+            and (datetime.strptime(d["deadline"], "%Y-%m-%d").date() - datetime.utcnow().date()).days == days
         ]
         if exact:
             msg = telegram_formatter.format_deadline_reminder(exact, days)
@@ -246,10 +245,10 @@ def run_deadlines(config: dict) -> None:
 # Режим: digest
 # ─────────────────────────────────────────────
 
-def run_digest(_config: dict) -> None:
+def run_digest(config: dict) -> None:
     """Щотижневий дайджест."""
     logger.info("Формування тижневого дайджесту…")
-    stats = notion_db.get_weekly_stats()
+    stats = notion_db.get_weekly_stats(config)
     msg = telegram_formatter.format_weekly_digest(stats)
     send_telegram(msg)
     logger.info("Дайджест надіслано")
@@ -286,7 +285,8 @@ def main():
         return
 
     if mode == "remove-topic" and len(sys.argv) >= 3:
-        result = config_manager.remove_topic(sys.argv[2])
+        topic_name = " ".join(sys.argv[2:])
+        result = config_manager.remove_topic(topic_name)
         print(result)
         return
 
@@ -323,7 +323,7 @@ def main():
 
     elif mode == "status":
         cron_info = {
-            "last_run": state.get("last_run", "Ніколи"),
+            "last_run": state.get("last_run") or "Ніколи",
             "total_found": state.get("total_found", 0),
             "next_run": "09:00 або 18:00",
         }

@@ -30,6 +30,28 @@ STATE_DIR = Path(os.environ.get("GRANT_SCOUT_STATE", Path.home() / ".grant-scout
 DB_ID_FILE = STATE_DIR / "notion_db_id.txt"
 
 
+def _get_properties_mapping(config: dict) -> dict:
+    """Отримати мапінг назв властивостей Notion з конфігу або значень за замовчуванням."""
+    default_props = {
+        "title": "Назва",
+        "summary": "Опис",
+        "url": "Посилання",
+        "source": "Джерело",
+        "type": "Тип",
+        "topics": "Тематика",
+        "deadline": "Дедлайн",
+        "found_date": "Дата знахідки",
+        "url_hash": "URL Hash"
+    }
+    if not config:
+        return default_props
+    config_props = config.get("notion", {}).get("properties", {})
+    props = {}
+    for key, val in default_props.items():
+        props[key] = config_props.get(key) or val
+    return props
+
+
 def _get_client() -> Client:
     api_key = os.environ.get("NOTION_API_KEY", "")
     if not api_key:
@@ -65,6 +87,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
     ID кешується у файлі notion_db_id.txt.
     """
     STATE_DIR.mkdir(parents=True, exist_ok=True)
+    props = _get_properties_mapping(config)
 
     # Перевірити кеш
     if DB_ID_FILE.exists():
@@ -74,7 +97,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
             try:
                 client.databases.update(
                     database_id=db_id,
-                    properties={"URL Hash": {"type": "rich_text", "rich_text": {}}}
+                    properties={props["url_hash"]: {"rich_text": {}}}
                 )
             except Exception as e:
                 logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
@@ -92,10 +115,10 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         parent={"type": "page_id", "page_id": page_id},
         title=[{"type": "text", "text": {"content": db_name}}],
         properties={
-            "Назва": {"title": {}},
-            "Опис": {"rich_text": {}},
-            "Посилання": {"url": {}},
-            "Джерело": {
+            props["title"]: {"title": {}},
+            props["summary"]: {"rich_text": {}},
+            props["url"]: {"url": {}},
+            props["source"]: {
                 "select": {
                     "options": [
                         {"name": "НФДУ", "color": "blue"},
@@ -106,7 +129,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Тип": {
+            props["type"]: {
                 "select": {
                     "options": [
                         {"name": "Грант", "color": "green"},
@@ -117,7 +140,7 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Тематика": {
+            props["topics"]: {
                 "multi_select": {
                     "options": [
                         {"name": "Освіта", "color": "yellow"},
@@ -129,9 +152,9 @@ def _get_or_create_database(client: Client, config: dict) -> str:
                     ]
                 }
             },
-            "Дедлайн": {"date": {}},
-            "Дата знахідки": {"date": {}},
-            "URL Hash": {"rich_text": {}},
+            props["deadline"]: {"date": {}},
+            props["found_date"]: {"date": {}},
+            props["url_hash"]: {"rich_text": {}},
         }
     )
     
@@ -141,26 +164,28 @@ def _get_or_create_database(client: Client, config: dict) -> str:
     return db_id
 
 
-def _load_hash_cache(client: Client, db_id: str) -> None:
+def _load_hash_cache(client: Client, db_id: str, config: dict) -> None:
     """Завантажити всі існуючі URL-хеші з Notion у кеш."""
     global _url_hash_cache, _cache_loaded
     if _cache_loaded:
         return
 
     logger.info("Завантаження кешу хешів з Notion…")
+    props_mapping = _get_properties_mapping(config)
+    url_hash_name = props_mapping["url_hash"]
     
-    # Отримати ID властивості "URL Hash", щоб уникнути помилки "Could not find property with name or id"
+    # Отримати ID властивості url_hash_name, щоб уникнути помилки "Could not find property with name or id"
     try:
         db_info = client.databases.retrieve(database_id=db_id)
         props = db_info.get("properties", {})
-        url_hash_prop = props.get("URL Hash")
+        url_hash_prop = props.get(url_hash_name)
         if not url_hash_prop:
-            logger.warning(f"Властивість 'URL Hash' не знайдена у базі даних! Наявні властивості: {list(props.keys())}")
+            logger.warning(f"Властивість '{url_hash_name}' не знайдена у базі даних! Наявні властивості: {list(props.keys())}")
             return
         prop_id = url_hash_prop.get("id")
     except Exception as e:
         logger.error(f"Помилка отримання схеми БД: {e}")
-        prop_id = "URL Hash"
+        prop_id = url_hash_name
 
     has_more = True
     start_cursor = None
@@ -182,11 +207,11 @@ def _load_hash_cache(client: Client, db_id: str) -> None:
             # Отримуємо значення за іменем або ID
             hash_prop = None
             for key, val in page_props.items():
-                if key == "URL Hash" or page_props[key].get("id") == prop_id:
+                if key == url_hash_name or page_props[key].get("id") == prop_id:
                     hash_prop = val.get("rich_text", [])
                     break
                     
-            if hash_prop:
+            if hash_prop and len(hash_prop) > 0 and "text" in hash_prop[0]:
                 _url_hash_cache.add(hash_prop[0]["text"]["content"])
 
         has_more = response.get("has_more", False)
@@ -212,33 +237,41 @@ def save_item(item: dict, config: dict) -> bool:
 
     client = _get_client()
     db_id = _get_or_create_database(client, config)
-    _load_hash_cache(client, db_id)
+    _load_hash_cache(client, db_id, config)
 
     url_hash = item.get("url_hash", "")
     if is_duplicate(url_hash):
         logger.debug(f"Дублікат: {item.get('title', '')[:50]}")
         return False
 
+    props_mapping = _get_properties_mapping(config)
+
     # Підготувати властивості
     props = {
-        "Назва": {"title": [{"text": {"content": item.get("title_uk", item.get("title", "Без назви"))[:2000]}}]},
-        "Опис": {"rich_text": [{"text": {"content": item.get("summary_uk", "")[:2000]}}]},
-        "Посилання": {"url": item.get("url", "")},
-        "Джерело": {"select": {"name": item.get("source_name", "Інше")[:100]}},
-        "Тип": {"select": {"name": item.get("type", "Невизначено")}},
-        "Дата знахідки": {"date": {"start": datetime.utcnow().strftime("%Y-%m-%d")}},
-        "URL Hash": {"rich_text": [{"text": {"content": url_hash}}]},
+        props_mapping["title"]: {"title": [{"text": {"content": item.get("title_uk", item.get("title", "Без назви"))[:2000]}}]},
+        props_mapping["summary"]: {"rich_text": [{"text": {"content": item.get("summary_uk", "")[:2000]}}]},
+        props_mapping["source"]: {"select": {"name": (item.get("source_name") or "Інше")[:100]}},
+        props_mapping["type"]: {"select": {"name": item.get("type", "Невизначено")}},
+        props_mapping["found_date"]: {"date": {"start": datetime.utcnow().strftime("%Y-%m-%d")}},
+        props_mapping["url_hash"]: {"rich_text": [{"text": {"content": url_hash}}]},
     }
+
+    # Посилання
+    url = item.get("url")
+    if url:
+        props[props_mapping["url"]] = {"url": url}
+    else:
+        props[props_mapping["url"]] = {"url": None}
 
     # Тематика
     topics = item.get("topics_detected", [])
     if topics:
-        props["Тематика"] = {"multi_select": [{"name": t} for t in topics[:5]]}
+        props[props_mapping["topics"]] = {"multi_select": [{"name": t} for t in topics[:5]]}
 
     # Дедлайн
     deadline = item.get("deadline")
     if deadline:
-        props["Дедлайн"] = {"date": {"start": deadline}}
+        props[props_mapping["deadline"]] = {"date": {"start": deadline}}
 
     try:
         client.pages.create(parent={"database_id": db_id}, properties=props)
@@ -250,7 +283,7 @@ def save_item(item: dict, config: dict) -> bool:
         return False
 
 
-def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
+def get_upcoming_deadlines(days_ahead: int = 7, config: dict = None) -> list[dict]:
     """
     Отримати записи з дедлайном у найближчі N днів.
     Повертає список словників для Telegram-нагадувань.
@@ -259,7 +292,9 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
         return []
 
     client = _get_client()
-    db_id = _get_or_create_database(client, {})
+    config = config or {}
+    db_id = _get_or_create_database(client, config)
+    props_mapping = _get_properties_mapping(config)
 
     today = datetime.utcnow().strftime("%Y-%m-%d")
     future = (datetime.utcnow() + timedelta(days=days_ahead)).strftime("%Y-%m-%d")
@@ -270,11 +305,11 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
             db_id,
             filter={
                 "and": [
-                    {"property": "Дедлайн", "date": {"on_or_after": today}},
-                    {"property": "Дедлайн", "date": {"on_or_before": future}},
+                    {"property": props_mapping["deadline"], "date": {"on_or_after": today}},
+                    {"property": props_mapping["deadline"], "date": {"on_or_before": future}},
                 ]
             },
-            sorts=[{"property": "Дедлайн", "direction": "ascending"}],
+            sorts=[{"property": props_mapping["deadline"], "direction": "ascending"}],
         )
     except APIResponseError as e:
         logger.error(f"Помилка запиту дедлайнів: {e}")
@@ -283,10 +318,10 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
     results = []
     for page in response.get("results", []):
         props = page.get("properties", {})
-        title_prop = props.get("Назва", {}).get("title", [])
-        deadline_prop = props.get("Дедлайн", {}).get("date", {})
-        url_prop = props.get("Посилання", {}).get("url", "")
-        type_prop = props.get("Тип", {}).get("select", {})
+        title_prop = props.get(props_mapping["title"], {}).get("title", [])
+        deadline_prop = props.get(props_mapping["deadline"], {}).get("date", {})
+        url_prop = props.get(props_mapping["url"], {}).get("url", "")
+        type_prop = props.get(props_mapping["type"], {}).get("select", {})
 
         title = title_prop[0]["text"]["content"] if title_prop else "Без назви"
         deadline = deadline_prop.get("start") if deadline_prop else None
@@ -304,24 +339,26 @@ def get_upcoming_deadlines(days_ahead: int = 7) -> list[dict]:
     return results
 
 
-def get_weekly_stats() -> dict:
+def get_weekly_stats(config: dict = None) -> dict:
     """Статистика за останній тиждень для дайджесту."""
     if not os.environ.get("NOTION_API_KEY", ""):
         return {}
 
     client = _get_client()
+    config = config or {}
     try:
-        db_id = _get_or_create_database(client, {})
+        db_id = _get_or_create_database(client, config)
     except Exception:
         return {}
 
+    props_mapping = _get_properties_mapping(config)
     week_ago = (datetime.utcnow() - timedelta(days=7)).strftime("%Y-%m-%d")
 
     try:
         response = _query_database(
             client,
             db_id,
-            filter={"property": "Дата знахідки", "date": {"on_or_after": week_ago}},
+            filter={"property": props_mapping["found_date"], "date": {"on_or_after": week_ago}},
         )
     except APIResponseError:
         return {}
@@ -331,20 +368,20 @@ def get_weekly_stats() -> dict:
         props = page.get("properties", {})
         stats["total"] += 1
 
-        type_name = (props.get("Тип", {}).get("select") or {}).get("name", "Невизначено")
+        type_name = (props.get(props_mapping["type"], {}).get("select") or {}).get("name", "Невизначено")
         stats["by_type"][type_name] = stats["by_type"].get(type_name, 0) + 1
 
-        for t in (props.get("Тематика", {}).get("multi_select") or []):
+        for t in (props.get(props_mapping["topics"], {}).get("multi_select") or []):
             tname = t.get("name", "")
             stats["by_topic"][tname] = stats["by_topic"].get(tname, 0) + 1
 
-        title_prop = props.get("Назва", {}).get("title", [])
-        deadline_prop = (props.get("Дедлайн", {}).get("date") or {})
+        title_prop = props.get(props_mapping["title"], {}).get("title", [])
+        deadline_prop = (props.get(props_mapping["deadline"], {}).get("date") or {})
         stats["items"].append({
             "title": title_prop[0]["text"]["content"] if title_prop else "",
             "type": type_name,
             "deadline": deadline_prop.get("start"),
-            "url": props.get("Посилання", {}).get("url", ""),
+            "url": props.get(props_mapping["url"], {}).get("url", ""),
         })
 
     return stats
