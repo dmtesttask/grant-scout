@@ -16,12 +16,10 @@ OpenRouter — єдина платформа для доступу до соте
 5. Дайте назву ключу (наприклад, `grant-scout`)
 6. Скопіюйте ключ — він починається з `sk-or-v1-...`
 
-**Безкоштовні моделі** (для початку):
-- `google/gemma-3-27b-it:free`
-- `meta-llama/llama-3.1-8b-instruct:free`
-- `mistralai/mistral-7b-instruct:free`
+**Налаштування пресету**:
+Система налаштована на використання пресету `f-irst`. Створіть його в налаштуваннях OpenRouter ([openrouter.ai/settings/presets](https://openrouter.ai/settings/presets)) та додайте до нього бажані моделі (наприклад, безкоштовні моделі: `google/gemma-3-27b-it:free`).
 
-Переглянути всі безкоштовні: [openrouter.ai/models?max_price=0](https://openrouter.ai/models?max_price=0)
+Переглянути всі безкоштовні моделі: [openrouter.ai/models?max_price=0](https://openrouter.ai/models?max_price=0)
 
 **Записати в `.env`:**
 ```

@@ -176,20 +176,9 @@ llm:
   provider: "openrouter"
   base_url: "https://openrouter.ai/api/v1"
 
-  # --- Варіант 1: пресет OpenRouter (рекомендовано) ---
-  # Створіть пресет на https://openrouter.ai/settings/presets
-  # та вкажіть його slug тут. Пресет замінює поле model нижче.
-  # Приклад: preset: "f-irst"
-  preset: "f-irst"                     # slug пресету, або порожньо щоб не використовувати
-
-  # --- Варіант 2: явна модель (fallback якщо preset порожній) ---
-  #   google/gemini-2.0-flash-exp:free   — безкоштовна, швидка
-  #   google/gemma-3-27b-it:free         — безкоштовна, велика
-  #   mistralai/mistral-7b-instruct:free — безкоштовна альтернатива
-  model: "google/gemma-3-27b-it:free"
+  preset: "f-irst"                     # Основне джерело істини для моделі (slug пресету OpenRouter)
 
   max_tokens: 500
   temperature: 0.1               # Низька температура для структурованих даних
-  # Пауза між запитами до LLM API (сек). Free-tier моделі мають жорсткий rate limit.
-  # Збільшіть якщо бачите 429 помилки. Зменшіть якщо використовуєте платну модель.
+  # Пауза між запитами до LLM API (сек).
   request_delay_sec: 3.0

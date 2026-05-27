@@ -89,14 +89,12 @@ def analyze_item(item: dict, config: dict) -> dict:
 
     llm_cfg = config.get("llm", {})
     preset = llm_cfg.get("preset", "").strip()
-    if preset:
-        model = f"@preset/{preset}"
-        logger.info(f"Використовуємо OpenRouter пресет: {model}")
-    else:
-        model = llm_cfg.get("model")
-        if not model:
-            logger.warning("llm.model не задано в config.yaml — використовуємо fallback аналіз")
-            return _fallback_analysis(item)
+    if not preset:
+        logger.warning("llm.preset не задано в config.yaml — використовуємо fallback аналіз")
+        return _fallback_analysis(item)
+        
+    model = f"@preset/{preset}"
+    logger.info(f"Використовуємо OpenRouter пресет: {model}")
     max_tokens = llm_cfg.get("max_tokens", 500)
     temperature = llm_cfg.get("temperature", 0.1)
 

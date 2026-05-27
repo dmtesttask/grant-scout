@@ -4,8 +4,7 @@
 # LLM Backend через OpenRouter
 model:
   provider: openrouter
-  # Модель вказана тут лише як fallback — основна береться з config.yaml
-  model: openrouter/free
+  preset: "f-irst"
   # API ключ береться з .env: OPENROUTER_API_KEY
   base_url: https://openrouter.ai/api/v1
 

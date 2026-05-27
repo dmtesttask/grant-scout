@@ -91,7 +91,7 @@ def _generate_keywords_llm(name: str, hints: list[str] = None) -> tuple[list[str
     if hints:
         hint_part = f" (підказки: {', '.join(hints)})"
 
-    # Єдине джерело правди — config.yaml (llm.preset або llm.model)
+    # Єдине джерело правди — config.yaml (llm.preset)
     try:
         config = load_config()
     except Exception as e:
@@ -100,14 +100,12 @@ def _generate_keywords_llm(name: str, hints: list[str] = None) -> tuple[list[str
 
     llm_cfg = config.get("llm", {})
     preset = llm_cfg.get("preset", "").strip()
-    if preset:
-        model = f"@preset/{preset}"
-        logger.info(f"Використовуємо OpenRouter пресет: {model}")
-    else:
-        model = llm_cfg.get("model")
-        if not model:
-            logger.warning("llm.model не задано в config.yaml — пропускаємо LLM генерацію")
-            return [], []
+    if not preset:
+        logger.warning("llm.preset не задано в config.yaml — пропускаємо LLM генерацію")
+        return [], []
+        
+    model = f"@preset/{preset}"
+    logger.info(f"Використовуємо OpenRouter пресет: {model}")
 
     prompt = KEYWORD_PROMPT.format(name=name, hint_part=hint_part)
     payload = {
