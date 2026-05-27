@@ -26,7 +26,11 @@ SITE_URL = "https://github.com/grant-scout"  # для OpenRouter HTTP-Referer
 ANALYSIS_PROMPT = """\
 You are an assistant for analyzing scientific grants and conferences. Analyze the text below and return a JSON object.
 
-IMPORTANT LANGUAGE RULE: The "title_uk" and "summary_uk" fields MUST be written in Ukrainian (uk-UA). All other fields follow their specified formats.
+Current date (UTC): {current_date}
+
+CRITICAL RULES:
+1. LANGUAGE RULE: The "title_uk" and "summary_uk" fields MUST be written in Ukrainian (uk-UA).
+2. FUTURE EVENTS ONLY: We are only interested in FUTURE events, grants, and conferences. If the text indicates the event/conference/deadline has already occurred or is in the past relative to the current date ({current_date}), or if the text uses past tense to describe the event (e.g. "відбулася", "пройшла", "took place", "was held", "completed"), you MUST set the "relevance" score to 0.
 
 Text to analyze:
 ---
@@ -99,10 +103,12 @@ def analyze_item(item: dict, config: dict) -> dict:
     max_tokens = llm_cfg.get("max_tokens", 500)
     temperature = llm_cfg.get("temperature", 0.1)
 
+    current_date = datetime.utcnow().strftime("%Y-%m-%d")
     prompt = ANALYSIS_PROMPT.format(
         title=item.get("title", ""),
         url=item.get("url", ""),
         snippet=item.get("snippet", item.get("title", ""))[:500],
+        current_date=current_date,
     )
 
     payload = {
@@ -286,7 +292,7 @@ def analyze_batch(items: list[dict], config: dict) -> list[dict]:
     """
     min_relevance = config.get("telegram", {}).get("notifications", {}).get("min_relevance_score", 60)
     analyzed = []
-    current_date = datetime.now().date()
+    current_date = datetime.utcnow().date()
 
     for i, item in enumerate(items):
         logger.info(f"Аналіз {i+1}/{len(items)}: {item.get('title', '')[:60]}…")
