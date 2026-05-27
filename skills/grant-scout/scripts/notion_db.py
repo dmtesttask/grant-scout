@@ -150,14 +150,35 @@ def _get_or_create_database(client: Client, config: dict) -> str:
         if db_id:
             logger.debug(f"Використовуємо існуючу Notion БД: {db_id}")
             try:
+                # Перевіряємо, чи база дійсно існує
+                client.databases.retrieve(database_id=db_id)
+                # Оновлюємо властивості
                 _update_database(
                     client,
                     database_id=db_id,
                     properties={props["url_hash"]: {"rich_text": {}}}
                 )
+                return db_id
             except Exception as e:
-                logger.debug(f"Не вдалося оновити властивості БД (можливо вони вже існують): {e}")
-            return db_id
+                # Якщо БД видалено або до неї немає доступу, Notion API поверне 404 ObjectNotFound
+                is_not_found = False
+                if hasattr(e, "code") and e.code == "object_not_found":
+                    is_not_found = True
+                elif hasattr(e, "status") and e.status == 404:
+                    is_not_found = True
+                elif "object_not_found" in str(e).lower() or "404" in str(e):
+                    is_not_found = True
+                
+                if is_not_found:
+                    logger.warning(f"Кешована БД {db_id} не знайдена (можливо видалена). Буде створено нову.")
+                    if DB_ID_FILE.exists():
+                        try:
+                            DB_ID_FILE.unlink()
+                        except Exception:
+                            pass
+                else:
+                    logger.warning(f"Не вдалося перевірити або оновити БД {db_id}: {e}")
+                    return db_id
 
     # Створюємо базу даних
     logger.info("Створення нової Notion бази даних…")
