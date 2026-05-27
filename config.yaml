@@ -30,24 +30,24 @@ topics:
   - name: "Освіта"
     enabled: true
     keywords_uk:
-      - "грант освіта"
-      - "конкурс грантів освіта"
-      - "стипендія педагогам"
-      - "фінансування освітніх проєктів"
+      # - "грант освіта"
+      # - "конкурс грантів освіта"
+      # - "стипендія педагогам"
+      # - "фінансування освітніх проєктів"
       - "конференція освіта Україна"
     keywords_en:
-      - "education grant Ukraine"
-      - "education scholarship Ukraine"
+      # - "education grant Ukraine"
+      # - "education scholarship Ukraine"
       - "education conference Ukraine 2025"
-      - "teaching grant Ukraine"
+      # - "teaching grant Ukraine"
 
   - name: "Мистецтво"
     enabled: true
     keywords_uk:
       - "грант мистецтво"
       - "грант культура Україна"
-      - "конкурс художників"
-      - "стипендія митці"
+      # - "конкурс художників"
+      # - "стипендія митці"
       - "конференція мистецтво"
     keywords_en:
       - "art grant Ukraine"
@@ -70,13 +70,13 @@ topics:
   - name: "Комп'ютерні технології в освіті"
     enabled: true
     keywords_uk:
-      - "грант IT освіта"
-      - "EdTech конференція"
+      # - "грант IT освіта"
+      # - "EdTech конференція"
       - "цифрова освіта грант"
-      - "дистанційне навчання конкурс"
-      - "інноваційні технології освіта грант"
+      # - "дистанційне навчання конкурс"
+      # - "інноваційні технології освіта грант"
     keywords_en:
-      - "EdTech grant Ukraine"
+      # - "EdTech grant Ukraine"
       - "digital education grant Ukraine"
       - "e-learning conference Ukraine"
       - "education technology grant 2025"
@@ -89,7 +89,7 @@ sources:
     - id: "nfdu"
       name: "НФДУ"
       url: "https://nrfu.org.ua/news/"
-      enabled: true
+      enabled: false
       # CSS-селектори для парсингу (fallback: всі посилання на сторінці)
       selectors:
         container: ".news-list .news-item, article, .post"
@@ -100,7 +100,7 @@ sources:
     - id: "mon"
       name: "МОН України"
       url: "https://mon.gov.ua/news"
-      enabled: true
+      enabled: false
       selectors:
         container: ".news-item, .article-preview, article"
         title: "h2, h3, .title"
@@ -110,7 +110,7 @@ sources:
     - id: "euroosvita"
       name: "ЄвроОсвіта"
       url: "https://euroosvita.net/prog/"
-      enabled: true
+      enabled: false
       selectors:
         container: ".program-item, .news-item, article"
         title: "h2, h3, .title"
@@ -120,7 +120,7 @@ sources:
     - id: "ukrintei"
       name: "УкрІНТЕІ"
       url: "https://ukrintei.ua/news/"
-      enabled: true
+      enabled: false
       selectors:
         container: ".news-list li, .news-item, article"
         title: "h2, h3, .title, a"
@@ -132,7 +132,7 @@ sources:
     # Провайдер задається в .env: SEARCH_PROVIDER (serper або duckduckgo)
     # API ключ для Serper.dev задається в .env: SERPER_API_KEY
     max_results_per_query: 10
-    daily_limit: 20
+    daily_limit: 50
 
 # -------------------------------------------------------
 # Notion
@@ -178,7 +178,7 @@ llm:
 
   preset: "f-irst"                     # Основне джерело істини для моделі (slug пресету OpenRouter)
 
-  max_tokens: 500
-  temperature: 0.1               # Низька температура для структурованих даних
+  max_tokens: 1000
+  temperature: 0.3               # Низька температура для структурованих даних
   # Пауза між запитами до LLM API (сек).
   request_delay_sec: 3.0
